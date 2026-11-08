@@ -6,7 +6,8 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 - Android 14 MediaProjection app-window selection flow. Choose Standoff 2 as a single app window.
 - GPU-native capture: MediaProjection VirtualDisplay writes directly to a Surface backed by SurfaceTexture / OpenGL ES external texture. The current path avoids ImageReader-to-Java-RGBA copies and per-frame CPU texture uploads.
 - GLES 3.0 multi-pass renderer:
-  1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature, shadow lift and filmic/ACES-style highlight roll-off.
+  1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature and shadow lift.
+  2. RGBA16F intermediate render targets when half-float color-buffer support exists (RGBA8 fallback), preserving post-process highlight headroom; final ACES-style tone mapping and sRGB output.
   2. Quarter-resolution bright-pass extraction with adjustable threshold.
   3. Horizontal and vertical Gaussian bloom blur.
   4. Final composite with bloom, edge sharpening, vignette and sRGB output transfer.
@@ -17,7 +18,7 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 - No INTERNET permission, game APK modification, game asset replacement, process injection or anti-cheat bypass.
 
 ## Important limitations
-This is a screen-space image processor, not a replacement game renderer, graphics driver, DLSS implementation or true HDR output pipeline. MediaProjection exposes rendered pixels, not the game's depth buffer, normals, geometry, materials, motion vectors or light sources. The current build cannot create physically correct new dynamic 3D shadows, true ray-traced reflections, new geometry or missing highlight data. Shadow lift, local contrast, bloom and filmic tone mapping are post-processing approximations. Bloom is a real multi-pass Gaussian image-space effect; it is not a new light source.
+This is a screen-space image processor, not a replacement game renderer, graphics driver, DLSS implementation or true HDR output pipeline. MediaProjection exposes rendered pixels, not the game's depth buffer, normals, geometry, materials, motion vectors or light sources. The current build cannot create physically correct new dynamic 3D shadows, true ray-traced reflections, new geometry or missing highlight data. Shadow lift, local contrast, bloom and filmic tone mapping are post-processing approximations. Half-float intermediates preserve highlight headroom created by processing; they do not recover HDR data absent from the original SDR capture. Bloom is a real multi-pass Gaussian image-space effect; it is not a new light source.
 
 The 144 Hz display refresh rate does not guarantee 144 captured or processed frames per second. The notification reports incoming capture-frame rate and the cadence of completed render submissions separately; the latter is not a GPU timer query or proof that all GPU work has finished. The actual performance, thermals, visual quality, external-texture extension support and overlay compatibility must be tested on the physical device. No physical-device test has yet been performed.
 
