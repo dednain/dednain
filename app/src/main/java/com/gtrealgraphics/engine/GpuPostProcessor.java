@@ -46,7 +46,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         public static Settings defaults(){return new Settings();}
         public Settings copy(){Settings s=new Settings();s.saturation=saturation;s.contrast=contrast;s.exposure=exposure;s.bloom=bloom;s.sharpness=sharpness;s.hdrLook=hdrLook;s.shadowLift=shadowLift;s.localContrast=localContrast;s.temperature=temperature;s.vignette=vignette;s.bloomThreshold=bloomThreshold;s.renderScale=renderScale;return s;}
         public static Settings cinematic(){Settings s=new Settings();s.saturation=1.18f;s.contrast=1.12f;s.exposure=1.05f;s.bloom=0.38f;s.sharpness=0.12f;s.hdrLook=0.48f;s.shadowLift=0.045f;s.localContrast=0.16f;s.temperature=0.08f;s.vignette=0.16f;s.bloomThreshold=0.68f;s.renderScale=1.0f;return s;}
-        public static Settings competitive(){Settings s=new Settings();s.saturation=1.10f;s.contrast=1.16f;s.exposure=1.06f;s.bloom=0.08f;s.sharpness=0.32f;s.hdrLook=0.12f;s.shadowLift=0.09f;s.localContrast=0.22f;s.vignette=0f;s.bloomThreshold=0.85f;return s;}
+        public static Settings competitive(){Settings s=new Settings();s.saturation=1.10f;s.contrast=1.16f;s.exposure=1.06f;s.bloom=0.08f;s.sharpness=0.32f;s.hdrLook=0.12f;s.shadowLift=0.09f;s.localContrast=0.22f;s.vignette=0f;s.bloomThreshold=0.85f;s.renderScale=0.85f;return s;}
     }
 
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
