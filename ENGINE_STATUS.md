@@ -1,15 +1,25 @@
-# GT Real Graphics Engine — development status
+# GT Real Graphics Engine — current status
 
-Project branch: gt-real-graphics-engine
+Development branch: `gt-real-graphics-engine`
 
-Current alpha contains:
-- Android 14+ single-app MediaProjection consent flow.
-- A non-touchable overlay window.
-- OpenGL ES 3.0 shader-based GPU image processing.
-- RGBA frame acquisition, buffer reuse, and persistent texture updates.
-- Adjustable saturation, contrast, exposure, bloom-like glow, sharpening and shadow-detail lift.
-- Stop notification and on-screen controls.
+## Implemented
+- Android 14 MediaProjection single-app capture consent.
+- Direct VirtualDisplay -> SurfaceTexture -> GLES external texture input (GPU-native frame path).
+- Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
+- sRGB decode/encode, filmic highlight roll-off, exposure, contrast, saturation, temperature, shadow lift, local contrast, bloom, sharpening and vignette.
+- 50–100% render-scale control.
+- Natural, Cinematic and Competitive profiles.
+- Foreground notification with incoming capture FPS telemetry and Stop action.
+- Saved settings and capture-resize handling.
 
-Not implemented: Vulkan backend, neural depth estimation, physically correct shadows/reflections, geometry/material reconstruction, true HDR10, frame generation or a 144 FPS guarantee.
+## Not implemented / not claimed
+- Access to the game's depth buffer, normals, geometry, materials or light sources.
+- Physically correct dynamic 3D shadows, ray-traced reflections, ray tracing, path tracing, true HDR10 output, AI super-resolution, frame generation or 144 FPS guarantee.
+- Physical Infinix GT 20 Pro runtime validation.
 
-The first priority is a clean CI build and a real device test of capture stability and measured frame rate. Later performance work should replace the current Java frame copy with a GPU-native HardwareBuffer path, then profile GPU time before adding heavier effects.
+## Next validation gates
+1. Build a fresh APK in CI.
+2. Install on the GT 20 Pro and verify the ESSL3 external texture shader compiles on its GPU.
+3. Verify app-window capture does not recurse into the overlay.
+4. Measure capture input FPS, GPU render time, thermals and frame pacing.
+5. Tune render scale and shader cost from actual device measurements before adding further effects.
