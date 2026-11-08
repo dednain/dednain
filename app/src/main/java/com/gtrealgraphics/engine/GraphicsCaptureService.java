@@ -58,9 +58,8 @@ public final class GraphicsCaptureService extends Service {
         if(s==null)return;
         s.mainHandler.post(()->{
             if(s.overlay!=null&&!s.shuttingDown){
-                s.overlay.setVisibility(android.view.View.VISIBLE);
-                s.overlay.setAlpha(foreground?1.0f:0.0f);
-                Log.i(TAG,"Game foreground="+foreground+"; overlay alpha="+(foreground?1.0f:0.0f));
+                GraphicsAccessibilityService.setOverlayVisible(foreground);
+                Log.i(TAG,"Game foreground="+foreground+"; accessibility window alpha="+(foreground?1.0f:0.0f));
             }
         });
     }

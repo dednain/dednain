@@ -3,9 +3,6 @@ package com.gtrealgraphics.engine;
 import android.accessibilityservice.AccessibilityService;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -23,7 +20,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
     private static volatile boolean targetGameForeground;
     private WindowManager windowManager;
     private View attachedOverlay;
-    private String homePackage;
+    private WindowManager.LayoutParams attachedParams;
 
     public static boolean isEnabled(Context context) {
         String enabled=Settings.Secure.getString(
@@ -53,6 +50,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         view.setClickable(false);
         view.setFocusable(false);
         view.setFocusableInTouchMode(false);
+        view.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         if(attachedOverlay==view)return true;
         if(attachedOverlay!=null)detach(attachedOverlay);
         WindowManager.LayoutParams p=new WindowManager.LayoutParams(
@@ -65,12 +63,14 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE);
         p.gravity=Gravity.TOP|Gravity.START;
-        p.alpha=1.0f;
+        p.alpha=targetGameForeground?1.0f:0.0f;
         p.setTitle("GT Real Graphics Engine");
         p.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         try{
             windowManager.addView(view,p);
             attachedOverlay=view;
+            attachedParams=p;
+            view.setAlpha(targetGameForeground?1.0f:0.0f);
             return true;
         }catch(Throwable error){
             android.util.Log.e("GT-Accessibility","Could not attach trusted graphics overlay",error);
@@ -82,6 +82,24 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         if(view==null||windowManager==null||attachedOverlay!=view)return;
         try{windowManager.removeViewImmediate(view);}catch(Exception ignored){}
         attachedOverlay=null;
+        attachedParams=null;
+    }
+
+    public static void setOverlayVisible(boolean visible){
+        GraphicsAccessibilityService s=instance;
+        if(s==null||s.attachedOverlay==null||s.attachedParams==null)return;
+        s.runOnMainThread(()->{
+            if(s.attachedOverlay==null||s.attachedParams==null)return;
+            float alpha=visible?1.0f:0.0f;
+            s.attachedParams.alpha=alpha;
+            s.attachedOverlay.setAlpha(alpha);
+            try{s.windowManager.updateViewLayout(s.attachedOverlay,s.attachedParams);}
+            catch(Exception error){android.util.Log.w("GT-Accessibility","Could not update overlay window alpha",error);}
+        });
+    }
+    private void runOnMainThread(Runnable action){
+        if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())action.run();
+        else new android.os.Handler(android.os.Looper.getMainLooper()).post(action);
     }
 
     @Override public void onServiceConnected(){
@@ -89,28 +107,17 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
         targetGameForeground=false;
-        try{
-            Intent home=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-            android.content.pm.ResolveInfo resolved=getPackageManager().resolveActivity(home,PackageManager.MATCH_DEFAULT_ONLY);
-            homePackage=resolved!=null&&resolved.activityInfo!=null?resolved.activityInfo.packageName:null;
-        }catch(Exception ignored){homePackage=null;}
-        android.util.Log.i("GT-Accessibility","Connected; home="+homePackage+"; trusted overlay passes game touches");
+        android.util.Log.i("GT-Accessibility","Connected; overlay is non-touchable and visible only for Standoff 2");
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
-        if(event==null)return;int type=event.getEventType();
+        if(event==null)return;
+        int type=event.getEventType();
         if(type!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED&&type!=AccessibilityEvent.TYPE_WINDOWS_CHANGED)return;
-        CharSequence packageName=event.getPackageName();if(packageName==null)return;
-        String foregroundPackage=packageName.toString();if(foregroundPackage.isEmpty())return;
-        if(TARGET_GAME_PACKAGE.equals(foregroundPackage)){updateGameForeground(true,"target game foreground");return;}
-        if(getPackageName().equals(foregroundPackage)){updateGameForeground(false,"engine activity foreground");return;}
-        if(homePackage!=null&&homePackage.equals(foregroundPackage)){updateGameForeground(false,"home launcher foreground");return;}
-        // Ignore transient Android system windows: they are not app switches.
-        try{ApplicationInfo info=getPackageManager().getApplicationInfo(foregroundPackage,0);
-            int systemFlags=ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
-            if((info.flags&systemFlags)!=0){android.util.Log.d("GT-Accessibility","Ignoring system window: "+foregroundPackage);return;}
-            updateGameForeground(false,"another app foreground: "+foregroundPackage);
-        }catch(PackageManager.NameNotFoundException ignored){android.util.Log.d("GT-Accessibility","Ignoring unknown window: "+foregroundPackage);}
+        CharSequence name=event.getPackageName();if(name==null)return;
+        String packageName=name.toString();if(packageName.isEmpty())return;
+        if(getPackageName().equals(packageName))return; // Our own overlay must not hide itself.
+        updateGameForeground(TARGET_GAME_PACKAGE.equals(packageName),"window event: "+packageName);
     }
     private void updateGameForeground(boolean foreground,String reason){
         if(targetGameForeground==foreground)return;targetGameForeground=foreground;

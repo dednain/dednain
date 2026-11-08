@@ -48,3 +48,11 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 - Registered MediaProjection callback before the asynchronous VirtualDisplay creation path.
 - Added edge-aware micro-detail enhancement and halo-limited sharpening.
 - Added a micro-detail setting with a versioned preference migration.
+
+
+### 0.3.4-alpha
+- Window alpha is now updated at WindowManager level as well as on the view.
+- Any non-engine, non-target foreground window hides the graphics layer; Standoff 2 shows it again.
+- The engine ignores its own accessibility overlay events to avoid self-hiding.
+- Opening the engine activity hides the layer immediately.
+- Overlay remains non-touchable and non-focusable.

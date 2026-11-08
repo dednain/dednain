@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.3-alpha`
+Current version: `0.3.4-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -42,3 +42,10 @@ Current version: `0.3.3-alpha`
 - Added edge-aware image-space detail enhancement and bounded sharpening.
 - Added a persistent micro-detail setting.
 - Requires physical validation on Infinix GT 20 Pro; no claim of adding new game geometry or source textures.
+
+
+## 0.3.4-alpha
+- WindowManager-level alpha controls visibility.
+- Non-target app/system window events hide the layer; target game events show it.
+- Own overlay events are ignored; opening the engine UI hides the layer.
+- Requires real-device validation for touch pass-through and PiP/system UI behavior.
