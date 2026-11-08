@@ -22,7 +22,7 @@ import android.widget.TextView;
 import java.util.function.IntConsumer;
 
 public final class MainActivity extends Activity {
-    private static final int REQUEST_OVERLAY=4101,REQUEST_CAPTURE=4102;
+    private static final int REQUEST_CAPTURE=4102;
     private GpuPostProcessor.Settings settings=GpuPostProcessor.Settings.defaults();
     private TextView status;
     private LinearLayout root;
@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(19),dp(22),dp(19),dp(32));root.setBackgroundColor(0xff07101e);scroll.addView(root);
         TextView title=text("GT REAL GRAPHICS ENGINE",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
         TextView tag=text("REAL-TIME GPU PIPELINE  •  GLES 3.0  •  ANDROID 14+",10,0xff58e1c4);root.addView(tag);
-        TextView intro=text("GPU-native захват выбранного окна без копирования каждого кадра в Java. Пять проходов обработки: тональная стилизация, выделение света, Gaussian bloom и финальная композиция. RGBA16F промежуточные буферы используются, если видеодрайвер их поддерживает.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
+        TextView intro=text("GPU-native захват выбранного окна и полноэкранная обработка. Доверенное системное наложение пропускает касания в игру: можно нажимать и двигать игровые кнопки. Сервис не читает содержимое окон и не выполняет жесты.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
 
         Button start=button("ЗАПУСТИТЬ ОБРАБОТКУ",true);root.addView(start);start.setOnClickListener(v->startCaptureFlow());
         Button stop=button("ОСТАНОВИТЬ",false);root.addView(stop);stop.setOnClickListener(v->{stopService(new Intent(this,GraphicsCaptureService.class));setStatus("Обработка остановлена.");});
@@ -119,7 +119,19 @@ public final class MainActivity extends Activity {
     private void setStatus(String message){if(status!=null)status.setText("Статус: "+message);}
     private void startCaptureFlow(){
         if(Build.VERSION.SDK_INT<34){setStatus("Для захвата одного приложения требуется Android 14 или новее.");return;}
-        if(!Settings.canDrawOverlays(this)){setStatus("Разреши отображение поверх других приложений.");Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));startActivityForResult(i,REQUEST_OVERLAY);return;}
+        if(!GraphicsAccessibilityService.isEnabled(this)){
+            new AlertDialog.Builder(this)
+                .setTitle("Нужно включить доверенное наложение")
+                .setMessage("Android 12+ блокирует касания сквозь обычные непрозрачные окна. Поэтому движок использует системный тип окна Accessibility Overlay. Сервис нужен только для показа обработанной картинки и пропуска касаний в Standoff 2: он не читает содержимое окон, не нажимает кнопки и не выполняет жесты. Включи GT Real Graphics Engine в настройках специальных возможностей.")
+                .setNegativeButton("Отмена",(d,w)->{})
+                .setPositiveButton("Открыть настройки",(d,w)->startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+                .show();
+            return;
+        }
+        if(!GraphicsAccessibilityService.isConnected()){
+            setStatus("Специальные возможности включены. Подожди пару секунд и нажми запуск ещё раз.");
+            return;
+        }
         showCaptureInstructions();
     }
     private void showCaptureInstructions(){
@@ -131,9 +143,17 @@ public final class MainActivity extends Activity {
         MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
         startActivityForResult(m.createScreenCaptureIntent(MediaProjectionConfig.createConfigForUserChoice()),REQUEST_CAPTURE);
     }
+    @Override protected void onResume(){
+        super.onResume();
+        if(status!=null&&GraphicsAccessibilityService.isEnabled(this)){
+            setStatus(GraphicsAccessibilityService.isConnected()
+                ?"Доверенное наложение подключено. Можно запускать захват Standoff 2."
+                :"Специальные возможности включены; ожидаю подключения системного сервиса.");
+        }
+    }
+
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
-        if(requestCode==REQUEST_OVERLAY){if(Settings.canDrawOverlays(this))showCaptureInstructions();else setStatus("Разрешение на отображение поверх приложений не выдано.");return;}
         if(requestCode==REQUEST_CAPTURE){
             if(resultCode!=RESULT_OK||data==null){setStatus("Системный захват отменён.");return;}
             Intent service=new Intent(this,GraphicsCaptureService.class);service.putExtra(GraphicsCaptureService.EXTRA_RESULT_CODE,resultCode);service.putExtra(GraphicsCaptureService.EXTRA_RESULT_DATA,data);
