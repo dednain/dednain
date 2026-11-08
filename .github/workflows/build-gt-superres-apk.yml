@@ -1,4 +1,4 @@
-name: Build GT SuperRes APK
+name: Build GT SuperRes AI APK
 on:
   push:
     branches: [gt-superres-mobile]
@@ -16,11 +16,24 @@ jobs:
           java-version: '17'
       - name: Install Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Download trained ESRGAN neural model
+        run: |
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 --connect-timeout 15 --max-time 180 \
+            'https://github.com/captain-pool/GSOC/releases/download/2.0.0/compressed_esrgan.tflite' \
+            -o app/src/main/assets/esrgan.tflite
+          python3 - <<'PY'
+          import os
+          p='app/src/main/assets/esrgan.tflite'
+          data=open(p,'rb').read()
+          print("Model bytes:",len(data))
+          if len(data)<10000 or data[4:8]!=b'TFL3':
+            raise Exception("Invalid TFLite model")
+          PY
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -29,6 +42,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: GT-SuperRes-APK
+          name: GT-SuperRes-AI-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
