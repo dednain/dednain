@@ -85,7 +85,7 @@ public class FilterService extends Service {
       getHolder().setFormat(PixelFormat.TRANSLUCENT);setZOrderOnTop(true);
       ByteBuffer b=ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder());
       vertex=b.asFloatBuffer();vertex.put(new float[]{-1,-1,0,0, 1,-1,1,0, -1,1,0,1, 1,1,1,1});vertex.position(0);
-      Matrix.setIdentityM(transform,0);setRenderer(this);setRenderMode(RENDERMODE_WHEN_DIRTY);
+      android.opengl.Matrix.setIdentityM(transform,0);setRenderer(this);setRenderMode(RENDERMODE_WHEN_DIRTY);
     }
     private static int shader(int type,String code){
       int s=GLES20.glCreateShader(type);GLES20.glShaderSource(s,code);GLES20.glCompileShader(s);
