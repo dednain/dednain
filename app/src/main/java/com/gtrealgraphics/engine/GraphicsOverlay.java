@@ -41,6 +41,10 @@ public final class GraphicsOverlay extends GLSurfaceView {
         processor.setRendererErrorListener(listener);
     }
 
+    public void setRendererInfoListener(GpuPostProcessor.RendererInfoListener listener) {
+        processor.setRendererInfoListener(listener);
+    }
+
     public void setSettings(GpuPostProcessor.Settings settings) {
         processor.setSettings(settings);
         requestRender();
