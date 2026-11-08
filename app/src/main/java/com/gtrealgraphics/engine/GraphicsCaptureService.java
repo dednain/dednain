@@ -8,306 +8,192 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
-import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
-import android.media.Image;
-import android.media.ImageReader;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.IBinder;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.Surface;
 import android.view.WindowManager;
 
-import java.nio.ByteBuffer;
-
 public final class GraphicsCaptureService extends Service {
-    private static final String TAG = "GTGraphicsCapture";
-    private static final String CHANNEL_ID = "gt_graphics_capture";
-    private static final int NOTIFICATION_ID = 7301;
-    public static final String EXTRA_RESULT_CODE = "projection_result_code";
-    public static final String EXTRA_RESULT_DATA = "projection_result_data";
-    private static final String ACTION_STOP = "com.gtrealgraphics.engine.STOP";
-
+    private static final String TAG="GTGraphicsCapture";
+    private static final String CHANNEL_ID="gt_graphics_capture";
+    private static final int NOTIFICATION_ID=7301;
+    public static final String EXTRA_RESULT_CODE="projection_result_code";
+    public static final String EXTRA_RESULT_DATA="projection_result_data";
+    private static final String ACTION_STOP="com.gtrealgraphics.engine.STOP";
     private static volatile GraphicsCaptureService activeInstance;
 
     private MediaProjection projection;
+    private MediaProjection.Callback projectionCallback;
     private VirtualDisplay virtualDisplay;
-    private ImageReader imageReader;
-    private HandlerThread captureThread;
-    private Handler captureHandler;
     private WindowManager windowManager;
     private GraphicsOverlay overlay;
-    private int densityDpi;
-    private int captureWidth;
-    private int captureHeight;
+    private Surface captureSurface;
+    private int densityDpi,captureWidth,captureHeight;
     private long fpsWindowStart;
-    private int framesInWindow;
+    private int framesInWindow,lastFps;
     private volatile boolean shuttingDown;
 
-    public static void updateSettings(GpuPostProcessor.Settings settings) {
-        GraphicsCaptureService service = activeInstance;
-        if (service != null && service.overlay != null) {
-            service.overlay.setSettings(settings);
-        }
+    public static void updateSettings(GpuPostProcessor.Settings settings){
+        GraphicsCaptureService s=activeInstance;
+        if(s!=null&&s.overlay!=null)s.overlay.setSettings(settings);
     }
+    @Override public IBinder onBind(Intent intent){return null;}
+    @Override public void onCreate(){super.onCreate();activeInstance=this;createNotificationChannel();}
 
-    @Override public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override public void onCreate() {
-        super.onCreate();
-        activeInstance = this;
-        createNotificationChannel();
-    }
-
-    @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null || ACTION_STOP.equals(intent.getAction())) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-        if (projection != null) return START_NOT_STICKY;
-
-        try {
+    @Override public int onStartCommand(Intent intent,int flags,int startId){
+        if(intent==null||ACTION_STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
+        if(projection!=null)return START_NOT_STICKY;
+        try{
             startAsForeground();
-            int resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0);
+            int resultCode=intent.getIntExtra(EXTRA_RESULT_CODE,0);
             Intent resultData;
-            if (Build.VERSION.SDK_INT >= 33) {
-                resultData = intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent.class);
-            } else {
-                resultData = intent.getParcelableExtra(EXTRA_RESULT_DATA);
-            }
-            if (resultCode == 0 || resultData == null) {
-                throw new IllegalStateException("Screen capture consent data is missing");
-            }
+            if(Build.VERSION.SDK_INT>=33)resultData=intent.getParcelableExtra(EXTRA_RESULT_DATA,Intent.class);
+            else resultData=intent.getParcelableExtra(EXTRA_RESULT_DATA);
+            if(resultCode==0||resultData==null)throw new IllegalStateException("Missing MediaProjection consent");
+            MediaProjectionManager manager=(MediaProjectionManager)getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+            projection=manager.getMediaProjection(resultCode,resultData);
+            if(projection==null)throw new IllegalStateException("MediaProjection unavailable");
 
-            MediaProjectionManager manager =
-                (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-            projection = manager.getMediaProjection(resultCode, resultData);
-            if (projection == null) throw new IllegalStateException("MediaProjection unavailable");
-
-            captureThread = new HandlerThread("GT-Capture-Frames");
-            captureThread.start();
-            captureHandler = new Handler(captureThread.getLooper());
-
-            DisplayMetrics metrics = new DisplayMetrics();
-            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+            DisplayMetrics metrics=new DisplayMetrics();
             windowManager.getDefaultDisplay().getRealMetrics(metrics);
-            densityDpi = metrics.densityDpi;
+            densityDpi=metrics.densityDpi;
+            captureWidth=metrics.widthPixels;
+            captureHeight=metrics.heightPixels;
 
-            overlay = new GraphicsOverlay(this);
-            android.content.SharedPreferences prefs = getSharedPreferences("gt_graphics", MODE_PRIVATE);
-            GpuPostProcessor.Settings initial = GpuPostProcessor.Settings.defaults();
-            initial.saturation = prefs.getFloat("saturation", initial.saturation);
-            initial.contrast = prefs.getFloat("contrast", initial.contrast);
-            initial.exposure = prefs.getFloat("exposure", initial.exposure);
-            initial.hdrLook = prefs.getFloat("hdrLook", initial.hdrLook);
-            initial.bloom = prefs.getFloat("bloom", initial.bloom);
-            initial.sharpness = prefs.getFloat("sharpness", initial.sharpness);
-            initial.shadowLift = prefs.getFloat("shadowLift", initial.shadowLift);
-            overlay.setSettings(initial);
+            overlay=new GraphicsOverlay(this);
+            overlay.setCaptureSize(captureWidth,captureHeight);
+            overlay.setSettings(loadSettings());
+            overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
+            overlay.setFrameAvailableListener(this::recordFrame);
             addOverlay();
 
-            projection.registerCallback(new MediaProjection.Callback() {
-                @Override public void onStop() {
-                    stopSelf();
+            projectionCallback=new MediaProjection.Callback(){
+                @Override public void onStop(){stopSelf();}
+                @Override public void onCapturedContentResize(int width,int height){
+                    if(width<=0||height<=0||shuttingDown)return;
+                    captureWidth=width;captureHeight=height;
+                    if(overlay!=null)overlay.setCaptureSize(width,height);
+                    if(virtualDisplay!=null)virtualDisplay.resize(width,height,densityDpi);
+                    Log.i(TAG,"Captured app resized to "+width+"x"+height);
                 }
-
-                @Override public void onCapturedContentResize(int width, int height) {
-                    if (width > 0 && height > 0 && captureHandler != null) {
-                        captureHandler.post(() -> resizeCapture(width, height));
-                    }
+                @Override public void onCapturedContentVisibilityChanged(boolean visible){
+                    if(overlay!=null)overlay.post(()->overlay.setVisibility(visible?android.view.View.VISIBLE:android.view.View.INVISIBLE));
                 }
-
-                @Override public void onCapturedContentVisibilityChanged(boolean isVisible) {
-                    if (overlay != null) {
-                        overlay.post(() -> overlay.setVisibility(isVisible ? android.view.View.VISIBLE : android.view.View.INVISIBLE));
-                    }
-                }
-            }, captureHandler);
-
-            setupCapture(metrics.widthPixels, metrics.heightPixels, true);
-            fpsWindowStart = System.currentTimeMillis();
-        } catch (Throwable error) {
-            Log.e(TAG, "Could not start capture pipeline", error);
-            updateNotification("Не удалось запустить графический конвейер");
+            };
+            projection.registerCallback(projectionCallback,new android.os.Handler(getMainLooper()));
+            fpsWindowStart=System.currentTimeMillis();
+            updateNotification("Ожидание GPU SurfaceTexture");
+        }catch(Throwable error){
+            Log.e(TAG,"Could not start GPU capture",error);
+            updateNotification("Ошибка запуска: "+error.getClass().getSimpleName());
             stopSelf();
         }
         return START_NOT_STICKY;
     }
 
-    private void startAsForeground() {
-        Intent stopIntent = new Intent(this, GraphicsCaptureService.class);
-        stopIntent.setAction(ACTION_STOP);
-        PendingIntent stopPending = PendingIntent.getService(
-            this, 7302, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        Notification notification = new Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setContentTitle("GT Real Graphics Engine")
-            .setContentText("GPU-постобработка активна")
-            .setOngoing(true)
-            .addAction(android.R.drawable.ic_media_pause, "Остановить", stopPending)
-            .build();
-
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
-        }
+    private GpuPostProcessor.Settings loadSettings(){
+        android.content.SharedPreferences p=getSharedPreferences("gt_graphics",MODE_PRIVATE);
+        GpuPostProcessor.Settings s=GpuPostProcessor.Settings.defaults();
+        s.saturation=p.getFloat("saturation",s.saturation);
+        s.contrast=p.getFloat("contrast",s.contrast);
+        s.exposure=p.getFloat("exposure",s.exposure);
+        s.hdrLook=p.getFloat("hdrLook",s.hdrLook);
+        s.bloom=p.getFloat("bloom",s.bloom);
+        s.sharpness=p.getFloat("sharpness",s.sharpness);
+        s.shadowLift=p.getFloat("shadowLift",s.shadowLift);
+        s.localContrast=p.getFloat("localContrast",s.localContrast);
+        s.temperature=p.getFloat("temperature",s.temperature);
+        s.vignette=p.getFloat("vignette",s.vignette);
+        s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);
+        return s;
     }
 
-    private void createNotificationChannel() {
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager != null && Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, "GT Graphics Engine", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Состояние GPU-постобработки экрана");
-            manager.createNotificationChannel(channel);
-        }
-    }
-
-    private void addOverlay() {
-        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.setTitle("GT Real Graphics Engine");
-        windowManager.addView(overlay, params);
-    }
-
-    private void resizeCapture(int width, int height) {
-        if (shuttingDown || projection == null || width <= 0 || height <= 0) return;
-        setupCapture(width, height, false);
-    }
-
-    private void setupCapture(int width, int height, boolean firstCreate) {
-        if (width <= 0 || height <= 0) return;
-        if (imageReader != null) {
-            imageReader.setOnImageAvailableListener(null, null);
-            imageReader.close();
-            imageReader = null;
-        }
-        captureWidth = width;
-        captureHeight = height;
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
-        imageReader.setOnImageAvailableListener(this::onImageAvailable, captureHandler);
-
-        if (firstCreate) {
-            virtualDisplay = projection.createVirtualDisplay(
-                "GT-Real-Graphics-Capture",
-                width, height, densityDpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(), null, captureHandler);
-        } else if (virtualDisplay != null) {
-            virtualDisplay.resize(width, height, densityDpi);
-            virtualDisplay.setSurface(imageReader.getSurface());
-        }
-    }
-
-    private void onImageAvailable(ImageReader source) {
-        if (shuttingDown || overlay == null) return;
-        Image image = null;
-        try {
-            image = source.acquireLatestImage();
-            if (image == null) return;
-            int width = image.getWidth();
-            int height = image.getHeight();
-            Image.Plane[] planes = image.getPlanes();
-            if (planes == null || planes.length == 0) return;
-            Image.Plane plane = planes[0];
-            int pixelStride = plane.getPixelStride();
-            int rowStride = plane.getRowStride();
-            if (pixelStride != 4 || width <= 0 || height <= 0) return;
-
-            int byteCount = width * height * 4;
-            byte[] rgba = overlay.obtainFrameBuffer(byteCount);
-            ByteBuffer input = plane.getBuffer();
-            int rowBytes = width * 4;
-            for (int y = 0; y < height; y++) {
-                input.position(y * rowStride);
-                input.get(rgba, y * rowBytes, rowBytes);
+    private void onInputSurfaceReady(Surface surface){
+        if(shuttingDown||projection==null){if(surface!=null)surface.release();return;}
+        try{
+            if(virtualDisplay==null){
+                captureSurface=surface;
+                virtualDisplay=projection.createVirtualDisplay(
+                    "GT-Real-Graphics-GPU-Capture",captureWidth,captureHeight,densityDpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    captureSurface,null,new android.os.Handler(getMainLooper()));
+            }else{
+                Surface old=captureSurface;
+                captureSurface=surface;
+                virtualDisplay.setSurface(surface);
+                if(old!=null&&old!=surface)old.release();
             }
-            overlay.submitFrame(rgba, width, height);
-            recordFrame();
-        } catch (Throwable error) {
-            Log.w(TAG, "Frame copy failed", error);
-        } finally {
-            if (image != null) image.close();
-        }
+            updateNotification("GPU capture active • waiting for frames");
+            Log.i(TAG,"GPU-native virtual display created: "+captureWidth+"x"+captureHeight);
+        }catch(Throwable e){Log.e(TAG,"VirtualDisplay creation failed",e);updateNotification("Не удалось создать GPU-захват");stopSelf();}
     }
 
-    private void recordFrame() {
-        framesInWindow++;
-        long now = System.currentTimeMillis();
-        long elapsed = now - fpsWindowStart;
-        if (elapsed >= 2000) {
-            int fps = Math.round(framesInWindow * 1000f / elapsed);
-            updateNotification("Захват: " + fps + " кадров/с • GPU-постобработка");
-            framesInWindow = 0;
-            fpsWindowStart = now;
-        }
+    private void addOverlay(){
+        WindowManager.LayoutParams p=new WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE|
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN|
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            android.graphics.PixelFormat.TRANSLUCENT);
+        p.gravity=Gravity.TOP|Gravity.START;
+        p.setTitle("GT Real Graphics Engine");
+        windowManager.addView(overlay,p);
     }
 
-    private void updateNotification(String message) {
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager == null) return;
-        Intent stopIntent = new Intent(this, GraphicsCaptureService.class);
-        stopIntent.setAction(ACTION_STOP);
-        PendingIntent stopPending = PendingIntent.getService(
-            this, 7302, stopIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification notification = new Notification.Builder(this, CHANNEL_ID)
+    private void startAsForeground(){
+        Intent stop=new Intent(this,GraphicsCaptureService.class);stop.setAction(ACTION_STOP);
+        PendingIntent pending=PendingIntent.getService(this,7302,stop,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification n=new Notification.Builder(this,CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_view)
             .setContentTitle("GT Real Graphics Engine")
-            .setContentText(message)
+            .setContentText("Запуск GPU-конвейера")
             .setOngoing(true)
-            .addAction(android.R.drawable.ic_media_pause, "Остановить", stopPending)
-            .build();
-        manager.notify(NOTIFICATION_ID, notification);
+            .addAction(android.R.drawable.ic_media_pause,"Остановить",pending).build();
+        if(Build.VERSION.SDK_INT>=29)startForeground(NOTIFICATION_ID,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+        else startForeground(NOTIFICATION_ID,n);
+    }
+    private void createNotificationChannel(){
+        NotificationManager m=getSystemService(NotificationManager.class);
+        if(m!=null&&Build.VERSION.SDK_INT>=26){NotificationChannel c=new NotificationChannel(CHANNEL_ID,"GT Graphics Engine",NotificationManager.IMPORTANCE_LOW);c.setDescription("Состояние GPU-постобработки");m.createNotificationChannel(c);}
+    }
+    private void recordFrame(){
+        if(shuttingDown)return;
+        framesInWindow++;long now=System.currentTimeMillis();long elapsed=now-fpsWindowStart;
+        if(elapsed>=2000){lastFps=Math.round(framesInWindow*1000f/elapsed);framesInWindow=0;fpsWindowStart=now;updateNotification("GPU input: "+lastFps+" FPS • multi-pass post-process");}
+    }
+    private void updateNotification(String message){
+        NotificationManager m=getSystemService(NotificationManager.class);if(m==null)return;
+        Intent stop=new Intent(this,GraphicsCaptureService.class);stop.setAction(ACTION_STOP);
+        PendingIntent pending=PendingIntent.getService(this,7302,stop,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+        Notification n=new Notification.Builder(this,CHANNEL_ID).setSmallIcon(android.R.drawable.ic_menu_view)
+            .setContentTitle("GT Real Graphics Engine").setContentText(message).setOngoing(true)
+            .addAction(android.R.drawable.ic_media_pause,"Остановить",pending).build();
+        m.notify(NOTIFICATION_ID,n);
     }
 
-    @Override public void onDestroy() {
-        shuttingDown = true;
-        activeInstance = null;
-
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
-            virtualDisplay = null;
+    @Override public void onDestroy(){
+        shuttingDown=true;activeInstance=null;
+        if(virtualDisplay!=null){virtualDisplay.release();virtualDisplay=null;}
+        if(projection!=null){
+            try{if(projectionCallback!=null)projection.unregisterCallback(projectionCallback);}catch(Exception ignored){}
+            try{projection.stop();}catch(Exception ignored){}
+            projection=null;
         }
-        if (projection != null) {
-            try { projection.stop(); } catch (Exception ignored) {}
-            projection = null;
+        if(overlay!=null&&windowManager!=null){
+            try{windowManager.removeViewImmediate(overlay);}catch(Exception ignored){}
+            overlay.releaseRenderer();overlay=null;
         }
-        if (imageReader != null) {
-            imageReader.setOnImageAvailableListener(null, null);
-            imageReader.close();
-            imageReader = null;
-        }
-        if (overlay != null && windowManager != null) {
-            try { windowManager.removeViewImmediate(overlay); } catch (Exception ignored) {}
-            overlay.releaseRenderer();
-            overlay = null;
-        }
-        if (captureThread != null) {
-            captureThread.quitSafely();
-            captureThread = null;
-            captureHandler = null;
-        }
+        if(captureSurface!=null){try{captureSurface.release();}catch(Exception ignored){}captureSurface=null;}
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
     }
