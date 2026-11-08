@@ -62,6 +62,44 @@ public final class EsrganEngine implements Closeable {
     small.recycle();
     return result;
   }
+  /**
+   * Process image in overlapping-scene tiles rather than shrinking
+   * an entire 1080p screenshot into a 320x180 input. Tiled 4x AI
+   * maintains substantially more scene detail on high-res photos.
+   */
+  public synchronized Bitmap enhancePhoto(Bitmap source){
+    if(source==null)throw new IllegalArgumentException("Missing photo");
+    boolean portrait=source.getHeight()>source.getWidth();
+    Bitmap rotated=source;
+    if(portrait){
+      Matrix r=new Matrix();r.postRotate(90);
+      rotated=Bitmap.createBitmap(source,0,0,source.getWidth(),source.getHeight(),r,true);
+    }
+    int w=rotated.getWidth(),h=rotated.getHeight();
+    int columns=Math.max(1,Math.min(4,(w+599)/600));
+    int rows=Math.max(1,Math.min(3,(h+359)/360));
+    Bitmap combined=Bitmap.createBitmap(columns*OUT_W,rows*OUT_H,Bitmap.Config.ARGB_8888);
+    android.graphics.Canvas canvas=new android.graphics.Canvas(combined);
+    android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+    for(int row=0;row<rows;row++){
+      for(int col=0;col<columns;col++){
+        int x0=w*col/columns,x1=w*(col+1)/columns;
+        int y0=h*row/rows,y1=h*(row+1)/rows;
+        Bitmap tile=Bitmap.createBitmap(rotated,x0,y0,x1-x0,y1-y0);
+        Bitmap enhancedTile=enhance(tile);
+        canvas.drawBitmap(enhancedTile,col*OUT_W,row*OUT_H,paint);
+        enhancedTile.recycle();tile.recycle();
+      }
+    }
+    if(rotated!=source)rotated.recycle();
+    if(portrait){
+      Matrix r=new Matrix();r.postRotate(-90);
+      Bitmap upright=Bitmap.createBitmap(combined,0,0,combined.getWidth(),combined.getHeight(),r,true);
+      combined.recycle();
+      return upright;
+    }
+    return combined;
+  }
   private static int clip(float v){return Math.max(0,Math.min(255,Math.round(v)));}
   @Override public void close(){interpreter.close();}
 }
