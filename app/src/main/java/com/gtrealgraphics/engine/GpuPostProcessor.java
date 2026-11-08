@@ -38,10 +38,10 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uTexture;uniform vec2 uDirection;\n"+
         "void main(){vec3 c=texture(uTexture,vUv).rgb*0.227027;c+=texture(uTexture,vUv+uDirection*1.384615).rgb*0.316216;c+=texture(uTexture,vUv-uDirection*1.384615).rgb*0.316216;c+=texture(uTexture,vUv+uDirection*3.230769).rgb*0.070270;c+=texture(uTexture,vUv-uDirection*3.230769).rgb*0.070270;fragColor=vec4(c,1.0);}\n";
     private static final String FINAL=
-        "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene,uBloom;uniform vec2 uTexel;uniform float uBloomStrength,uSharpness,uVignette,uHdrLook;\n"+
+        "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene,uBloom;uniform vec2 uTexel,uUvScale;uniform float uBloomStrength,uSharpness,uVignette,uHdrLook;\n"+
         "vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);}\n"+
         "vec3 toSrgb(vec3 c){return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}\n"+
-        "void main(){vec3 c=texture(uScene,vUv).rgb;vec3 n=texture(uScene,vUv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,vUv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,vUv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,vUv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,vUv).rgb*uBloomStrength;c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
+        "void main(){vec2 uv=(vUv-vec2(0.5))*uUvScale+vec2(0.5);vec3 c=texture(uScene,uv).rgb;vec3 n=texture(uScene,uv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,uv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,uv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,uv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,uv).rgb*uBloomStrength;c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
 
     private static final float[] QUAD={-1,-1,0,1, 1,-1,1,1, -1,1,0,0, 1,1,1,0};
     public static final class Settings {
@@ -71,7 +71,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private int sceneProgram,brightProgram,blurProgram,finalProgram;
     private int sceneInputLoc,sceneMatrixLoc,sceneTexelLoc,sceneExposureLoc,sceneContrastLoc,sceneSaturationLoc,sceneShadowLoc,sceneLocalContrastLoc,sceneTemperatureLoc;
     private int brightSceneLoc,brightTexelLoc,brightThresholdLoc,blurTextureLoc,blurDirectionLoc;
-    private int finalSceneLoc,finalBloomLoc,finalTexelLoc,finalBloomStrengthLoc,finalSharpnessLoc,finalVignetteLoc,finalHdrLoc;
+    private int finalSceneLoc,finalBloomLoc,finalTexelLoc,finalBloomStrengthLoc,finalSharpnessLoc,finalVignetteLoc,finalHdrLoc,finalUvScaleLoc;
     private int sceneTexture,sceneFbo,bloomTextureA,bloomFboA,bloomTextureB,bloomFboB;
     private int inputWidth,inputHeight,captureWidth,captureHeight,bloomWidth,bloomHeight,viewWidth,viewHeight;
     private float targetScale=1.0f;
@@ -100,7 +100,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
             if(extensions==null||!extensions.contains("GL_OES_EGL_image_external_essl3"))
                 throw new IllegalStateException("GPU driver lacks GL_OES_EGL_image_external_essl3");
             rgba16fSupported=extensions.contains("GL_EXT_color_buffer_half_float")||extensions.contains("GL_EXT_color_buffer_float");
-            GLES30.glClearColor(0,0,0,1);GLES30.glDisable(GLES30.GL_DEPTH_TEST);
+            GLES30.glClearColor(0,0,0,1);GLES30.glDisable(GLES30.GL_DEPTH_TEST);GLES30.glDisable(GLES30.GL_BLEND);
             sceneProgram=program(VERTEX,SCENE);brightProgram=program(VERTEX,BRIGHT);blurProgram=program(VERTEX,BLUR);finalProgram=program(VERTEX,FINAL);
             sceneInputLoc=loc(sceneProgram,"uInput");sceneMatrixLoc=loc(sceneProgram,"uTexMatrix");sceneTexelLoc=loc(sceneProgram,"uTexel");
             sceneExposureLoc=loc(sceneProgram,"uExposure");sceneContrastLoc=loc(sceneProgram,"uContrast");sceneSaturationLoc=loc(sceneProgram,"uSaturation");
@@ -108,7 +108,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
             brightSceneLoc=loc(brightProgram,"uScene");brightTexelLoc=loc(brightProgram,"uTexel");brightThresholdLoc=loc(brightProgram,"uThreshold");
             blurTextureLoc=loc(blurProgram,"uTexture");blurDirectionLoc=loc(blurProgram,"uDirection");
             finalSceneLoc=loc(finalProgram,"uScene");finalBloomLoc=loc(finalProgram,"uBloom");finalTexelLoc=loc(finalProgram,"uTexel");
-            finalBloomStrengthLoc=loc(finalProgram,"uBloomStrength");finalSharpnessLoc=loc(finalProgram,"uSharpness");finalVignetteLoc=loc(finalProgram,"uVignette");finalHdrLoc=loc(finalProgram,"uHdrLook");
+            finalBloomStrengthLoc=loc(finalProgram,"uBloomStrength");finalSharpnessLoc=loc(finalProgram,"uSharpness");finalVignetteLoc=loc(finalProgram,"uVignette");finalHdrLoc=loc(finalProgram,"uHdrLook");finalUvScaleLoc=loc(finalProgram,"uUvScale");
             int[] ids=new int[1];GLES30.glGenTextures(1,ids,0);externalTexture=ids[0];GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);
             GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MIN_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MAG_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE);
             inputTexture=new SurfaceTexture(externalTexture);inputTexture.setDefaultBufferSize(requestedWidth,requestedHeight);
@@ -126,21 +126,92 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         }
     }
     @Override public void onSurfaceChanged(GL10 gl,int w,int h){viewWidth=w;viewHeight=h;GLES30.glViewport(0,0,w,h);ensureTargets(requestedWidth,requestedHeight);}
-    private void ensureTargets(int w,int h){if(w<=0||h<=0)return;float scale=Math.max(0.5f,Math.min(1.0f,settings.renderScale));int rw=Math.max(1,Math.round(w*scale)),rh=Math.max(1,Math.round(h*scale));if(targetsReady&&w==captureWidth&&h==captureHeight&&Math.abs(scale-targetScale)<0.001f)return;deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);captureWidth=w;captureHeight=h;inputWidth=rw;inputHeight=rh;targetScale=scale;bloomWidth=Math.max(1,rw/4);bloomHeight=Math.max(1,rh/4);int[] t=new int[1],f=new int[1];GLES30.glGenTextures(1,t,0);sceneTexture=t[0];allocTexture(sceneTexture,w,h);GLES30.glGenFramebuffers(1,f,0);sceneFbo=f[0];attach(sceneFbo,sceneTexture);GLES30.glGenTextures(1,t,0);bloomTextureA=t[0];allocTexture(bloomTextureA,bloomWidth,bloomHeight);GLES30.glGenFramebuffers(1,f,0);bloomFboA=f[0];attach(bloomFboA,bloomTextureA);GLES30.glGenTextures(1,t,0);bloomTextureB=t[0];allocTexture(bloomTextureB,bloomWidth,bloomHeight);GLES30.glGenFramebuffers(1,f,0);bloomFboB=f[0];attach(bloomFboB,bloomTextureB);GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);targetsReady=true;}
-    private void allocTexture(int id,int w,int h){GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,id);GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MIN_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MAG_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE);GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE);GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D,0,rgba16fSupported?GLES30.GL_RGBA16F:GLES30.GL_RGBA8,w,h,0,GLES30.GL_RGBA,rgba16fSupported?GLES30.GL_HALF_FLOAT:GLES30.GL_UNSIGNED_BYTE,null);}
-    private void attach(int f,int t){GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,f);GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER,GLES30.GL_COLOR_ATTACHMENT0,GLES30.GL_TEXTURE_2D,t,0);int status=GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER);if(status!=GLES30.GL_FRAMEBUFFER_COMPLETE)Log.e(TAG,"FBO incomplete: "+Integer.toHexString(status));}
+    private void ensureTargets(int w,int h){
+        if(w<=0||h<=0)return;
+        float scale=Math.max(0.5f,Math.min(1.0f,settings.renderScale));
+        int rw=Math.max(1,Math.round(w*scale)),rh=Math.max(1,Math.round(h*scale));
+        if(targetsReady&&w==captureWidth&&h==captureHeight&&Math.abs(scale-targetScale)<0.001f)return;
+        targetsReady=false;
+        deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);
+        sceneTexture=sceneFbo=bloomTextureA=bloomFboA=bloomTextureB=bloomFboB=0;
+        captureWidth=w;captureHeight=h;inputWidth=rw;inputHeight=rh;targetScale=scale;
+        bloomWidth=Math.max(1,rw/4);bloomHeight=Math.max(1,rh/4);
+        int[][] set=createTargetSet(rgba16fSupported);
+        if(!targetSetReady(set)&&rgba16fSupported){
+            deleteTargetSet(set);
+            rgba16fSupported=false;
+            set=createTargetSet(false);
+        }
+        if(!targetSetReady(set)){
+            deleteTargetSet(set);
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);
+            throw new IllegalStateException("Could not create complete GPU render targets (RGBA16F/RGBA8)");
+        }
+        rgba16fSupported=rgba16fSupported&&set[0]!=null;
+        sceneTexture=set[0][0];sceneFbo=set[0][1];
+        bloomTextureA=set[1][0];bloomFboA=set[1][1];
+        bloomTextureB=set[2][0];bloomFboB=set[2][1];
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);
+        targetsReady=true;
+    }
+    private int[][] createTargetSet(boolean halfFloat){
+        int[][] set=new int[3][];
+        set[0]=createTarget(inputWidth,inputHeight,halfFloat);
+        if(set[0]!=null)set[1]=createTarget(bloomWidth,bloomHeight,halfFloat);
+        if(set[1]!=null)set[2]=createTarget(bloomWidth,bloomHeight,halfFloat);
+        return set;
+    }
+    private boolean targetSetReady(int[][] set){return set!=null&&set.length==3&&set[0]!=null&&set[1]!=null&&set[2]!=null;}
+    private void deleteTargetSet(int[][] set){if(set!=null)for(int[] pair:set)if(pair!=null)deleteTarget(pair[0],pair[1]);}
+    private int[] createTarget(int w,int h,boolean halfFloat){
+        int[] t=new int[1],f=new int[1];
+        GLES30.glGenTextures(1,t,0);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,t[0]);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MIN_FILTER,GLES30.GL_LINEAR);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MAG_FILTER,GLES30.GL_LINEAR);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE);
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE);
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D,0,halfFloat?GLES30.GL_RGBA16F:GLES30.GL_RGBA8,w,h,0,GLES30.GL_RGBA,halfFloat?GLES30.GL_HALF_FLOAT:GLES30.GL_UNSIGNED_BYTE,null);
+        GLES30.glGenFramebuffers(1,f,0);GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,f[0]);
+        GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER,GLES30.GL_COLOR_ATTACHMENT0,GLES30.GL_TEXTURE_2D,t[0],0);
+        int status=GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER);
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);
+        if(status!=GLES30.GL_FRAMEBUFFER_COMPLETE){
+            Log.w(TAG,"Render target incomplete ("+(halfFloat?"RGBA16F":"RGBA8")+"): "+Integer.toHexString(status));
+            deleteTarget(t[0],f[0]);
+            return null;
+        }
+        return new int[]{t[0],f[0]};
+    }
 
     @Override public void onDrawFrame(GL10 gl){
-        if(released||inputTexture==null||sceneProgram==0)return;
+        if(released||inputTexture==null||sceneProgram==0||viewWidth<=0||viewHeight<=0)return;
         if(framePending.getAndSet(false)){try{inputTexture.updateTexImage();inputTexture.getTransformMatrix(textureMatrix);}catch(Exception e){Log.w(TAG,"updateTexImage",e);}}
-        if(captureWidth!=requestedWidth||captureHeight!=requestedHeight||Math.abs(targetScale-settings.renderScale)>0.001f)ensureTargets(requestedWidth,requestedHeight);
-        if(!targetsReady)return;Settings s=settings;
+        if(captureWidth!=requestedWidth||captureHeight!=requestedHeight||Math.abs(targetScale-settings.renderScale)>0.001f){
+            try{ensureTargets(requestedWidth,requestedHeight);}catch(Throwable error){reportRendererError(error);return;}
+        }
+        if(!targetsReady)return;
+        Settings s=settings;
+        GLES30.glDisable(GLES30.GL_BLEND);
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glUseProgram(sceneProgram);bindExternal();
         GLES30.glUniformMatrix4fv(sceneMatrixLoc,1,false,textureMatrix,0);u2(sceneTexelLoc,1f/captureWidth,1f/captureHeight);u1(sceneExposureLoc,s.exposure);u1(sceneContrastLoc,s.contrast);u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightSceneLoc);u2(brightTexelLoc,1f/inputWidth,1f/inputHeight);u1(brightThresholdLoc,s.bloomThreshold);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurTextureLoc);u2(blurDirectionLoc,1f/bloomWidth,0);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurTextureLoc);u2(blurDirectionLoc,0,1f/bloomHeight);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalSceneLoc);bind2D(1,bloomTextureA,finalBloomLoc);u2(finalTexelLoc,1f/inputWidth,1f/inputHeight);u1(finalBloomStrengthLoc,s.bloom);u1(finalSharpnessLoc,s.sharpness);u1(finalVignetteLoc,s.vignette);u1(finalHdrLoc,s.hdrLook);draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
+        float sourceAspect=(float)inputWidth/(float)inputHeight;
+        float outputAspect=(float)viewWidth/(float)viewHeight;
+        float uvScaleX=1f,uvScaleY=1f;
+        if(sourceAspect>outputAspect)uvScaleX=outputAspect/sourceAspect;
+        else uvScaleY=sourceAspect/outputAspect;
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);
+        bind2D(0,sceneTexture,finalSceneLoc);bind2D(1,bloomTextureA,finalBloomLoc);
+        u2(finalTexelLoc,1f/inputWidth,1f/inputHeight);u2(finalUvScaleLoc,uvScaleX,uvScaleY);
+        u1(finalBloomStrengthLoc,s.bloom);u1(finalSharpnessLoc,s.sharpness);u1(finalVignetteLoc,s.vignette);u1(finalHdrLoc,s.hdrLook);
+        draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
+    }
+    private void reportRendererError(Throwable error){
+        Log.e(TAG,"GPU render target update failed",error);
+        RendererErrorListener listener=rendererErrorListener;
+        if(listener!=null)mainHandler.post(()->listener.onRendererError(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()));
     }
     private void bindExternal(){GLES30.glActiveTexture(GLES30.GL_TEXTURE0);GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);GLES30.glUniform1i(sceneInputLoc,0);}
     private void bind2D(int unit,int texture,int samplerLocation){GLES30.glActiveTexture(GLES30.GL_TEXTURE0+unit);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,texture);GLES30.glUniform1i(samplerLocation,unit);}
