@@ -19,6 +19,7 @@ import javax.microedition.khronos.opengles.GL10;
 public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private static final String TAG="GT-GPU";
     public interface SurfaceReadyListener { void onSurfaceReady(Surface surface); }
+    public interface FrameAvailableListener { void onFrameAvailable(); }
 
     private static final String VERTEX=
         "#version 300 es\nlayout(location=0) in vec2 aPosition;\nlayout(location=1) in vec2 aTexCoord;\nout vec2 vUv;\nvoid main(){gl_Position=vec4(aPosition,0.0,1.0);vUv=aTexCoord;}\n";
@@ -53,6 +54,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private volatile boolean released;
     private Runnable renderRequest;
     private SurfaceReadyListener surfaceReadyListener;
+    private FrameAvailableListener frameAvailableListener;
     private SurfaceTexture inputTexture;
     private Surface inputSurface;
     private int externalTexture;
@@ -66,6 +68,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     public GpuPostProcessor(android.content.Context context){ByteBuffer b=ByteBuffer.allocateDirect(QUAD.length*4).order(ByteOrder.nativeOrder());quadBuffer=b.asFloatBuffer();quadBuffer.put(QUAD).position(0);}
     public void setRenderRequest(Runnable r){renderRequest=r;}
     public void setSurfaceReadyListener(SurfaceReadyListener l){surfaceReadyListener=l;}
+    public void setFrameAvailableListener(FrameAvailableListener l){frameAvailableListener=l;}
     public void setSettings(Settings s){if(s!=null)settings=s.copy();}
     public void setCaptureSize(int w,int h){if(w<=0||h<=0)return;requestedWidth=w;requestedHeight=h;SurfaceTexture st=inputTexture;if(st!=null){try{st.setDefaultBufferSize(w,h);}catch(Exception ignored){}}}
     public void releaseGlResources(){released=true;if(inputTexture!=null){try{inputTexture.setOnFrameAvailableListener(null);inputTexture.release();}catch(Exception ignored){}inputTexture=null;}if(inputSurface!=null){try{inputSurface.release();}catch(Exception ignored){}inputSurface=null;}deleteTexture(externalTexture);deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);if(sceneProgram!=0)GLES30.glDeleteProgram(sceneProgram);if(brightProgram!=0)GLES30.glDeleteProgram(brightProgram);if(blurProgram!=0)GLES30.glDeleteProgram(blurProgram);if(finalProgram!=0)GLES30.glDeleteProgram(finalProgram);sceneProgram=brightProgram=blurProgram=finalProgram=0;}
@@ -78,7 +81,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         int[] ids=new int[1];GLES30.glGenTextures(1,ids,0);externalTexture=ids[0];GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);
         GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MIN_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MAG_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE);
         inputTexture=new SurfaceTexture(externalTexture);inputTexture.setDefaultBufferSize(requestedWidth,requestedHeight);
-        inputTexture.setOnFrameAvailableListener(st->{framePending.set(true);Runnable r=renderRequest;if(r!=null)r.run();},mainHandler);
+        inputTexture.setOnFrameAvailableListener(st->{framePending.set(true);FrameAvailableListener fl=frameAvailableListener;if(fl!=null)fl.onFrameAvailable();Runnable r=renderRequest;if(r!=null)r.run();},mainHandler);
         inputSurface=new Surface(inputTexture);targetsReady=false;ensureTargets(requestedWidth,requestedHeight);
         SurfaceReadyListener l=surfaceReadyListener;Surface s=inputSurface;if(l!=null)mainHandler.post(()->{if(!released&&surfaceReadyListener!=null)surfaceReadyListener.onSurfaceReady(s);});
     }
