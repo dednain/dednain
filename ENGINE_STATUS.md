@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.6-alpha`
+Current version: `0.3.7-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -60,3 +60,9 @@ Current version: `0.3.6-alpha`
 - Ignore Android system packages and unknown package events.
 - Only real activity state changes control the overlay.
 - Requires device validation on Infinix GT 20 Pro.
+
+
+## 0.3.7-alpha
+- Safer SurfaceView visibility and stale-frame fail-safe.
+- Overlay hidden on every non-game foreground activity.
+- No device-level validation yet.

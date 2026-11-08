@@ -68,3 +68,12 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 - Ignore Android system packages so notification shade/System UI events cannot switch the game state to false.
 - Unknown package events are ignored; real third-party foreground apps hide the game overlay.
 - Accessibility notification timeout increased to 200 ms.
+
+
+### 0.3.7-alpha
+- Hide the GLSurfaceView with `View.INVISIBLE` instead of relying on alpha alone.
+- Remove `setZOrderOnTop(true)` to avoid a separately-composited stale surface above other apps.
+- Fail closed on every confirmed non-game activity, including Android System UI and launchers.
+- Show the processed surface only while Standoff 2 is foreground and fresh capture frames are arriving.
+- Add a 1.5-second stale-frame watchdog; hide the processed surface when capture stalls.
+- Detach the overlay if visibility updates fail.

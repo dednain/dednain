@@ -43,6 +43,17 @@ public final class GraphicsCaptureService extends Service {
     private volatile String rendererInfo="GLES3";
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
     private volatile boolean shuttingDown;
+    private volatile long lastInputFrameAtMs;
+    private final Runnable frameWatchdog=new Runnable(){
+        @Override public void run(){
+            if(shuttingDown)return;
+            long last=lastInputFrameAtMs;
+            boolean fresh=last>0&&System.currentTimeMillis()-last<=1500;
+            boolean game=GraphicsAccessibilityService.isTargetGameForeground();
+            if(!fresh||!game)GraphicsAccessibilityService.setOverlayVisible(false);
+            mainHandler.postDelayed(this,500);
+        }
+    };
 
     public static void updateSettings(GpuPostProcessor.Settings settings){
         GraphicsCaptureService s=activeInstance;
@@ -58,8 +69,11 @@ public final class GraphicsCaptureService extends Service {
         if(s==null)return;
         s.mainHandler.post(()->{
             if(s.overlay!=null&&!s.shuttingDown){
-                GraphicsAccessibilityService.setOverlayVisible(foreground);
-                Log.i(TAG,"Game foreground="+foreground+"; accessibility window alpha="+(foreground?1.0f:0.0f));
+                long last=s.lastInputFrameAtMs;
+                boolean fresh=last>0&&System.currentTimeMillis()-last<=1500;
+                boolean visible=foreground&&fresh;
+                GraphicsAccessibilityService.setOverlayVisible(visible);
+                Log.i(TAG,"Game foreground="+foreground+"; fresh GPU frame="+fresh+"; overlay visible="+visible);
             }
         });
     }
@@ -111,8 +125,8 @@ public final class GraphicsCaptureService extends Service {
             Context overlayContext=GraphicsAccessibilityService.activeContext();
             if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
             overlay=new GraphicsOverlay(overlayContext);
-            overlay.setAlpha(GraphicsAccessibilityService.isTargetGameForeground()?1.0f:0.0f);
-            overlay.setVisibility(android.view.View.VISIBLE);
+            overlay.setAlpha(1.0f);
+            overlay.setVisibility(android.view.View.INVISIBLE);
             overlay.setCaptureSize(captureWidth,captureHeight);
             overlay.setSettings(loadSettings());
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
@@ -124,6 +138,9 @@ public final class GraphicsCaptureService extends Service {
 
 
             fpsWindowStart=System.currentTimeMillis();
+            lastInputFrameAtMs=0;
+            mainHandler.removeCallbacks(frameWatchdog);
+            mainHandler.postDelayed(frameWatchdog,500);
             updateNotification("Ожидание GPU SurfaceTexture");
         }catch(Throwable error){
             Log.e(TAG,"Could not start GPU capture",error);
@@ -208,7 +225,10 @@ public final class GraphicsCaptureService extends Service {
     }
     private synchronized void recordFrame(){
         if(shuttingDown)return;
+        lastInputFrameAtMs=System.currentTimeMillis();
         inputFramesInWindow++;
+        if(GraphicsAccessibilityService.isTargetGameForeground())
+            GraphicsAccessibilityService.setOverlayVisible(true);
         publishFrameStats();
     }
     private synchronized void recordRenderedFrame(){
@@ -236,7 +256,10 @@ public final class GraphicsCaptureService extends Service {
     }
 
     @Override public void onDestroy(){
-        shuttingDown=true;activeInstance=null;
+        shuttingDown=true;
+        mainHandler.removeCallbacks(frameWatchdog);
+        GraphicsAccessibilityService.setOverlayVisible(false);
+        activeInstance=null;
         if(virtualDisplay!=null){virtualDisplay.release();virtualDisplay=null;}
         if(projection!=null){
             try{if(projectionCallback!=null)projection.unregisterCallback(projectionCallback);}catch(Exception ignored){}

@@ -13,8 +13,10 @@ public final class GraphicsOverlay extends GLSurfaceView {
         getHolder().setFormat(PixelFormat.OPAQUE);
         setEGLContextClientVersion(3);
         setEGLConfigChooser(8, 8, 8, 0, 0, 0);
-        setZOrderOnTop(true);
+        // Keep the SurfaceView inside the accessibility window's normal layer;
+        // forcing it above the window can leave a stale surface visible.
         setAlpha(1.0f);
+        setVisibility(android.view.View.INVISIBLE);
         setClickable(false);
         setFocusable(false);
         setFocusableInTouchMode(false);

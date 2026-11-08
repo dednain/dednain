@@ -45,7 +45,7 @@ public final class MainActivity extends Activity {
     private void buildUi(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(19),dp(22),dp(19),dp(32));root.setBackgroundColor(0xff07101e);scroll.addView(root);
-        TextView title=text("GT REAL GRAPHICS ENGINE 0.3.6",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
+        TextView title=text("GT REAL GRAPHICS ENGINE 0.3.7",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
         TextView tag=text("REAL-TIME GPU PIPELINE  •  GLES 3.0  •  ANDROID 14+",10,0xff58e1c4);root.addView(tag);
         TextView intro=text("GPU-native захват выбранного окна и полноэкранная обработка. Доверенное системное наложение не принимает касания: Android направляет их в Standoff 2. Сервис проверяет только имя активного пакета, чтобы скрывать графический слой вне игры; содержимое окон не читается, жесты не выполняются.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
 

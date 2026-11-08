@@ -4,8 +4,6 @@ import android.accessibilityservice.AccessibilityService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -38,6 +36,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
     public static boolean isTargetGameForeground(){return targetGameForeground;}
     public static void forceHideOverlay(){
         targetGameForeground=false;
+        setOverlayVisible(false);
         GraphicsCaptureService.setGameForeground(false);
     }
     public static Context activeContext(){GraphicsAccessibilityService s=instance;return s;}
@@ -58,7 +57,10 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         view.setFocusable(false);
         view.setFocusableInTouchMode(false);
         view.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        if(attachedOverlay==view)return true;
+        if(attachedOverlay==view){
+            view.setVisibility(targetGameForeground?View.VISIBLE:View.INVISIBLE);
+            return true;
+        }
         if(attachedOverlay!=null)detach(attachedOverlay);
         WindowManager.LayoutParams p=new WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -70,23 +72,28 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE);
         p.gravity=Gravity.TOP|Gravity.START;
-        p.alpha=targetGameForeground?1.0f:0.0f;
+        p.alpha=1.0f;
         p.setTitle("GT Real Graphics Engine");
         p.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        // GLSurfaceView owns a separate Surface. Visibility, not View alpha, is the
+        // reliable way to remove that Surface from composition while another app is open.
+        view.setAlpha(1.0f);
+        view.setVisibility(targetGameForeground?View.VISIBLE:View.INVISIBLE);
         try{
             windowManager.addView(view,p);
             attachedOverlay=view;
             attachedParams=p;
-            view.setAlpha(targetGameForeground?1.0f:0.0f);
             return true;
         }catch(Throwable error){
             android.util.Log.e("GT-Accessibility","Could not attach trusted graphics overlay",error);
+            try{view.setVisibility(View.INVISIBLE);}catch(Exception ignored){}
             return false;
         }
     }
 
     private void detach(View view){
         if(view==null||windowManager==null||attachedOverlay!=view)return;
+        try{view.setVisibility(View.INVISIBLE);}catch(Exception ignored){}
         try{windowManager.removeViewImmediate(view);}catch(Exception ignored){}
         attachedOverlay=null;
         attachedParams=null;
@@ -94,14 +101,28 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
 
     public static void setOverlayVisible(boolean visible){
         GraphicsAccessibilityService s=instance;
-        if(s==null||s.attachedOverlay==null||s.attachedParams==null)return;
+        if(s==null)return;
         s.runOnMainThread(()->{
-            if(s.attachedOverlay==null||s.attachedParams==null)return;
-            float alpha=visible?1.0f:0.0f;
-            s.attachedParams.alpha=alpha;
-            s.attachedOverlay.setAlpha(alpha);
-            try{s.windowManager.updateViewLayout(s.attachedOverlay,s.attachedParams);}
-            catch(Exception error){android.util.Log.w("GT-Accessibility","Could not update overlay window alpha",error);}
+            View view=s.attachedOverlay;
+            WindowManager.LayoutParams params=s.attachedParams;
+            if(view==null||params==null)return;
+            // A queued show request must not resurrect the overlay after a newer hide.
+            if(visible&&!targetGameForeground)return;
+            try{
+                if(!visible){
+                    // Hide the SurfaceView itself first; alpha alone can leave its
+                    // separately-composited last frame visible over other apps.
+                    view.setVisibility(View.INVISIBLE);
+                }else{
+                    view.setAlpha(1.0f);
+                    view.setVisibility(View.VISIBLE);
+                }
+                params.alpha=1.0f;
+                s.windowManager.updateViewLayout(view,params);
+            }catch(Exception error){
+                android.util.Log.e("GT-Accessibility","Overlay visibility update failed; detaching for safety",error);
+                s.detach(view);
+            }
         });
     }
     private void runOnMainThread(Runnable action){
@@ -114,37 +135,20 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
         targetGameForeground=false;
-        android.util.Log.i("GT-Accessibility","Connected; overlay is non-touchable and visible only for Standoff 2");
+        android.util.Log.i("GT-Accessibility","Connected; overlay starts hidden and is shown only while Standoff 2 is foreground");
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
-        if(event==null)return;
-        // TYPE_WINDOWS_CHANGED fires for transient system/overlay windows and can
-        // incorrectly report System UI after the game is already foreground.
-        // Only a real top-activity change is allowed to switch the game state.
-        if(event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
+        if(event==null||event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
         CharSequence name=event.getPackageName();
         if(name==null)return;
         String packageName=name.toString();
         if(packageName.isEmpty()||getPackageName().equals(packageName))return;
-        if(TARGET_GAME_PACKAGE.equals(packageName)){
-            updateGameForeground(true,"target game activity changed");
-            return;
-        }
-        // Ignore Android/system apps (status bar, notification shade, permission UI,
-        // keyboard and transient system windows). They do not mean the game was closed.
-        try{
-            ApplicationInfo info=getPackageManager().getApplicationInfo(packageName,0);
-            int systemFlags=ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
-            if((info.flags&systemFlags)!=0){
-                android.util.Log.d("GT-Accessibility","Ignoring transient system activity: "+packageName);
-                return;
-            }
-        }catch(PackageManager.NameNotFoundException ignored){
-            android.util.Log.d("GT-Accessibility","Ignoring unknown window package: "+packageName);
-            return;
-        }
-        updateGameForeground(false,"another app became foreground: "+packageName);
+        // Fail closed: any confirmed non-game foreground activity (including
+        // System UI, launcher, notification shade and TikTok) hides the Surface.
+        // The effect is shown again only after Standoff 2 becomes active.
+        boolean game=TARGET_GAME_PACKAGE.equals(packageName);
+        updateGameForeground(game,game?"Standoff 2 became active":"non-game activity: "+packageName);
     }
     private void updateGameForeground(boolean foreground,String reason){
         if(targetGameForeground==foreground)return;targetGameForeground=foreground;
