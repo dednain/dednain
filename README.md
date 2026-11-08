@@ -1,35 +1,27 @@
-# 👋 Hi, I'm dednain
+# GT Real Graphics Engine — Android alpha
 
-I build small, dependency-free AI systems that run anywhere — no GPU required.
+A standalone Android 14+ GPU post-processing overlay prototype targeting the Infinix GT 20 Pro.
 
-## 🔥 Featured project
+## Implemented in this first build
+- Android MediaProjection user-choice capture. In the system picker, choose Standoff 2 as a **single app window**, not the entire display.
+- OpenGL ES 3.0 GPU fragment-shader pipeline.
+- RGBA frame upload to a persistent GPU texture.
+- Live controls: saturation, contrast, exposure, HDR-look tone mapping, bloom-like glow, edge sharpening and shadow-detail lift.
+- A separate, non-touchable overlay window with a foreground notification and Stop action.
+- Capture-size change handling and a small reusable frame-buffer pool.
+- No INTERNET permission. No Standoff 2 APK, source, assets, process injection or game-file changes.
 
-### [Gestalt-Net](https://github.com/dednain/gestalt-net)
-> **Long memory for AI without the memory.**
+## What this is not
+This is not a graphics driver, DLSS, a replacement game renderer or a true HDR pipeline. MediaProjection gives the app rendered pixels only; it does not expose the game's depth buffer, normals, geometry, materials, motion vectors or light sources. Therefore the current shader cannot create physically correct new dynamic shadows, true geometric reflections, new player/weapon models or missing HDR highlight information. The controls are image-space approximations.
 
-A pure-Python retrospective memory architecture. It reads text in
-**BEFORE → CURRENT → AFTER** triads, deletes closed scenes, keeps an eternal
-**Dossier** of short tags, and writes ~22-byte **Sleep-Triggers** that restore
-forgotten objects 500 pages later.
+The screen capture path includes Android capture, frame copying and a separate overlay. It is not guaranteed to sustain 144 processed FPS. A 144 Hz display and 144 newly captured/processed frames per second are different. FPS is measured in the service notification; actual performance must be tested on the phone. Select only Standoff 2 in Android's single-app capture picker. Selecting the entire display can capture the overlay again.
 
-| | |
-|---|---|
-| 📉 Retained context | **−86.5%** (478,193 → 64,716 bytes) |
-| 🗜️ Compression | **7.4×** |
-| 🎯 Answer accuracy | **100%** on 200 unseen books |
-| 🧠 Learned weights | **198**, ~1 s training on CPU |
-| ✅ Verification | **27/27** independent checks |
-| 📦 Dependencies | **0** — Python 3.8+ stdlib only |
+The app requests the standard Android screen-capture consent and draw-over-other-apps permission. It does not suppress system prompts or bypass DRM/secure surfaces.
 
-🌐 [Landing page](https://dednain.github.io/gestalt-net/) · 📖 [README](https://github.com/dednain/gestalt-net#readme) · 🚀 [Release v1.0.0](https://github.com/dednain/gestalt-net/releases/tag/v1.0.0)
+## Build
+GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles the debug APK and uploads the artifact "GT-Real-Graphics-Engine-APK".
 
-```bash
-git clone https://github.com/dednain/gestalt-net.git
-cd gestalt-net && python3 gestalt/verify.py
-```
-
-*Honest note: this is not a transformer, and we measured retained text bytes —
-not VRAM. The corpus is synthetic. Full limitations in the README.*
-
----
-MIT · Built with the Python standard library.
+## Target
+- Android 14+ (API 34)
+- OpenGL ES 3.0
+- Infinix GT 20 Pro is the intended test device; no on-device validation has yet been performed.
