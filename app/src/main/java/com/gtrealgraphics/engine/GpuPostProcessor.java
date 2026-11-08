@@ -67,6 +67,9 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private final float[] textureMatrix=new float[16];
     private final FloatBuffer quadBuffer;
     private int sceneProgram,brightProgram,blurProgram,finalProgram;
+    private int sceneInputLoc,sceneMatrixLoc,sceneTexelLoc,sceneExposureLoc,sceneContrastLoc,sceneSaturationLoc,sceneShadowLoc,sceneLocalContrastLoc,sceneTemperatureLoc,sceneHdrLoc;
+    private int brightSceneLoc,brightTexelLoc,brightThresholdLoc,blurTextureLoc,blurDirectionLoc;
+    private int finalSceneLoc,finalBloomLoc,finalTexelLoc,finalBloomStrengthLoc,finalSharpnessLoc,finalVignetteLoc;
     private int sceneTexture,sceneFbo,bloomTextureA,bloomFboA,bloomTextureB,bloomFboB;
     private int inputWidth,inputHeight,captureWidth,captureHeight,bloomWidth,bloomHeight,viewWidth,viewHeight;
     private float targetScale=1.0f;
@@ -95,6 +98,13 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
                 throw new IllegalStateException("GPU driver lacks GL_OES_EGL_image_external_essl3");
             GLES30.glClearColor(0,0,0,1);GLES30.glDisable(GLES30.GL_DEPTH_TEST);
             sceneProgram=program(VERTEX,SCENE);brightProgram=program(VERTEX,BRIGHT);blurProgram=program(VERTEX,BLUR);finalProgram=program(VERTEX,FINAL);
+            sceneInputLoc=loc(sceneProgram,"uInput");sceneMatrixLoc=loc(sceneProgram,"uTexMatrix");sceneTexelLoc=loc(sceneProgram,"uTexel");
+            sceneExposureLoc=loc(sceneProgram,"uExposure");sceneContrastLoc=loc(sceneProgram,"uContrast");sceneSaturationLoc=loc(sceneProgram,"uSaturation");
+            sceneShadowLoc=loc(sceneProgram,"uShadowLift");sceneLocalContrastLoc=loc(sceneProgram,"uLocalContrast");sceneTemperatureLoc=loc(sceneProgram,"uTemperature");sceneHdrLoc=loc(sceneProgram,"uHdrLook");
+            brightSceneLoc=loc(brightProgram,"uScene");brightTexelLoc=loc(brightProgram,"uTexel");brightThresholdLoc=loc(brightProgram,"uThreshold");
+            blurTextureLoc=loc(blurProgram,"uTexture");blurDirectionLoc=loc(blurProgram,"uDirection");
+            finalSceneLoc=loc(finalProgram,"uScene");finalBloomLoc=loc(finalProgram,"uBloom");finalTexelLoc=loc(finalProgram,"uTexel");
+            finalBloomStrengthLoc=loc(finalProgram,"uBloomStrength");finalSharpnessLoc=loc(finalProgram,"uSharpness");finalVignetteLoc=loc(finalProgram,"uVignette");
             int[] ids=new int[1];GLES30.glGenTextures(1,ids,0);externalTexture=ids[0];GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);
             GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MIN_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_MAG_FILTER,GLES30.GL_LINEAR);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE);GLES30.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE);
             inputTexture=new SurfaceTexture(externalTexture);inputTexture.setDefaultBufferSize(requestedWidth,requestedHeight);
@@ -119,17 +129,17 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         if(captureWidth!=requestedWidth||captureHeight!=requestedHeight||Math.abs(targetScale-settings.renderScale)>0.001f)ensureTargets(requestedWidth,requestedHeight);
         if(!targetsReady)return;Settings s=settings;
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glUseProgram(sceneProgram);bindExternal();
-        GLES30.glUniformMatrix4fv(loc(sceneProgram,"uTexMatrix"),1,false,textureMatrix,0);u2(sceneProgram,"uTexel",1f/captureWidth,1f/captureHeight);u1(sceneProgram,"uExposure",s.exposure);u1(sceneProgram,"uContrast",s.contrast);u1(sceneProgram,"uSaturation",s.saturation);u1(sceneProgram,"uShadowLift",s.shadowLift);u1(sceneProgram,"uLocalContrast",s.localContrast);u1(sceneProgram,"uTemperature",s.temperature);u1(sceneProgram,"uHdrLook",s.hdrLook);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightProgram,"uScene");u2(brightProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(brightProgram,"uThreshold",s.bloomThreshold);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurProgram,"uTexture");u2(blurProgram,"uDirection",1f/bloomWidth,0);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurProgram,"uTexture");u2(blurProgram,"uDirection",0,1f/bloomHeight);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalProgram,"uScene");bind2D(1,bloomTextureA,finalProgram,"uBloom");u2(finalProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(finalProgram,"uBloomStrength",s.bloom);u1(finalProgram,"uSharpness",s.sharpness);u1(finalProgram,"uVignette",s.vignette);draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
+        GLES30.glUniformMatrix4fv(sceneMatrixLoc,1,false,textureMatrix,0);u2(sceneTexelLoc,1f/captureWidth,1f/captureHeight);u1(sceneExposureLoc,s.exposure);u1(sceneContrastLoc,s.contrast);u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);u1(sceneHdrLoc,s.hdrLook);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightSceneLoc);u2(brightTexelLoc,1f/inputWidth,1f/inputHeight);u1(brightThresholdLoc,s.bloomThreshold);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurTextureLoc);u2(blurDirectionLoc,1f/bloomWidth,0);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurTextureLoc);u2(blurDirectionLoc,0,1f/bloomHeight);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalSceneLoc);bind2D(1,bloomTextureA,finalBloomLoc);u2(finalTexelLoc,1f/inputWidth,1f/inputHeight);u1(finalBloomStrengthLoc,s.bloom);u1(finalSharpnessLoc,s.sharpness);u1(finalVignetteLoc,s.vignette);draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
     }
-    private void bindExternal(){GLES30.glActiveTexture(GLES30.GL_TEXTURE0);GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);GLES30.glUniform1i(loc(sceneProgram,"uInput"),0);}
-    private void bind2D(int unit,int texture,int p,String sampler){GLES30.glActiveTexture(GLES30.GL_TEXTURE0+unit);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,texture);GLES30.glUniform1i(loc(p,sampler),unit);}
+    private void bindExternal(){GLES30.glActiveTexture(GLES30.GL_TEXTURE0);GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);GLES30.glUniform1i(sceneInputLoc,0);}
+    private void bind2D(int unit,int texture,int samplerLocation){GLES30.glActiveTexture(GLES30.GL_TEXTURE0+unit);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,texture);GLES30.glUniform1i(samplerLocation,unit);}
     private int loc(int p,String n){return GLES30.glGetUniformLocation(p,n);}
-    private void u1(int p,String n,float v){GLES30.glUniform1f(loc(p,n),v);}
-    private void u2(int p,String n,float x,float y){GLES30.glUniform2f(loc(p,n),x,y);}
+    private void u1(int location,float v){GLES30.glUniform1f(location,v);}
+    private void u2(int location,float x,float y){GLES30.glUniform2f(location,x,y);}
     private void draw(){quadBuffer.position(0);GLES30.glEnableVertexAttribArray(0);GLES30.glEnableVertexAttribArray(1);GLES30.glVertexAttribPointer(0,2,GLES30.GL_FLOAT,false,16,quadBuffer);quadBuffer.position(2);GLES30.glVertexAttribPointer(1,2,GLES30.GL_FLOAT,false,16,quadBuffer);GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP,0,4);GLES30.glDisableVertexAttribArray(0);GLES30.glDisableVertexAttribArray(1);}
     private int program(String v,String f){int vs=compile(GLES30.GL_VERTEX_SHADER,v),fs=compile(GLES30.GL_FRAGMENT_SHADER,f);int p=GLES30.glCreateProgram();GLES30.glAttachShader(p,vs);GLES30.glAttachShader(p,fs);GLES30.glLinkProgram(p);int[] ok=new int[1];GLES30.glGetProgramiv(p,GLES30.GL_LINK_STATUS,ok,0);GLES30.glDeleteShader(vs);GLES30.glDeleteShader(fs);if(ok[0]==0){String log=GLES30.glGetProgramInfoLog(p);GLES30.glDeleteProgram(p);throw new IllegalStateException("Shader link: "+log);}return p;}
     private int compile(int type,String src){int s=GLES30.glCreateShader(type);GLES30.glShaderSource(s,src);GLES30.glCompileShader(s);int[] ok=new int[1];GLES30.glGetShaderiv(s,GLES30.GL_COMPILE_STATUS,ok,0);if(ok[0]==0){String log=GLES30.glGetShaderInfoLog(s);GLES30.glDeleteShader(s);throw new IllegalStateException("Shader compile: "+log);}return s;}
