@@ -63,45 +63,55 @@ public final class EsrganEngine implements Closeable {
     return result;
   }
   /**
-   * Process image in scene tiles rather than shrinking
-   * an entire 1080p screenshot into a 320x180 input. Tiled 4x AI
-   * maintains substantially more scene detail on high-res photos.
+   * Upscale a still image while preserving source pixels. The trained 320x180
+   * model is applied to individual tiles. Mixing the original high-res pixels
+   * back into the output avoids the blocky look of stretched 720p neural frames.
+   * Not a live 60 FPS filter or true HDR.
    */
-  public synchronized Bitmap enhancePhoto(Bitmap source){
+  public synchronized Bitmap enhancePhoto(Bitmap source,float neuralWeight){
     if(source==null)throw new IllegalArgumentException("Missing photo");
+    neuralWeight=Math.max(0f,Math.min(1f,neuralWeight));
     boolean portrait=source.getHeight()>source.getWidth();
     Bitmap rotated=source;
     if(portrait){
-      Matrix r=new Matrix();r.postRotate(90);
-      rotated=Bitmap.createBitmap(source,0,0,source.getWidth(),source.getHeight(),r,true);
+      Matrix rotation=new Matrix();rotation.postRotate(90);
+      rotated=Bitmap.createBitmap(source,0,0,source.getWidth(),source.getHeight(),rotation,true);
     }
     int w=rotated.getWidth(),h=rotated.getHeight();
     int columns=Math.max(1,Math.min(4,(w+599)/600));
     int rows=Math.max(1,Math.min(3,(h+359)/360));
-    float scale=(float)Math.min((columns*(double)OUT_W)/w,(rows*(double)OUT_H)/h);
+    float maxScale=3072f/Math.max(w,h);
+    float scale=Math.max(1f,Math.min(2f,maxScale));
     int targetW=Math.max(2,Math.round(w*scale)),targetH=Math.max(2,Math.round(h*scale));
     Bitmap combined=Bitmap.createBitmap(targetW,targetH,Bitmap.Config.ARGB_8888);
     android.graphics.Canvas canvas=new android.graphics.Canvas(combined);
     android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
-    for(int row=0;row<rows;row++){
-      for(int col=0;col<columns;col++){
-        int x0=w*col/columns,x1=w*(col+1)/columns;
-        int y0=h*row/rows,y1=h*(row+1)/rows;
-        Bitmap tile=Bitmap.createBitmap(rotated,x0,y0,x1-x0,y1-y0);
-        Bitmap enhancedTile=enhance(tile);
-        android.graphics.Rect dest=new android.graphics.Rect(
-          Math.round((float)col*targetW/columns),Math.round((float)row*targetH/rows),
-          Math.round((float)(col+1)*targetW/columns),Math.round((float)(row+1)*targetH/rows));
-        canvas.drawBitmap(enhancedTile,null,dest,paint);
-        enhancedTile.recycle();tile.recycle();
+    android.graphics.Rect fullDest=new android.graphics.Rect(0,0,targetW,targetH);
+    canvas.drawBitmap(rotated,null,fullDest,paint);
+    // An unprocessed 0% strength frame is not fed to the model.
+    if(neuralWeight>0f) {
+      android.graphics.Paint neuralPaint=new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+      neuralPaint.setAlpha(Math.max(1,Math.round(neuralWeight*255f)));
+      for(int row=0;row<rows;row++){
+        for(int col=0;col<columns;col++){
+          int x0=w*col/columns,x1=w*(col+1)/columns;
+          int y0=h*row/rows,y1=h*(row+1)/rows;
+          Bitmap tile=Bitmap.createBitmap(rotated,x0,y0,x1-x0,y1-y0);
+          Bitmap neural=enhance(tile);
+          android.graphics.Rect dest=new android.graphics.Rect(
+            Math.round((float)x0*targetW/w),Math.round((float)y0*targetH/h),
+            Math.round((float)x1*targetW/w),Math.round((float)y1*targetH/h));
+          canvas.drawBitmap(neural,null,dest,neuralPaint);
+          neural.recycle();
+          tile.recycle();
+        }
       }
     }
     if(rotated!=source)rotated.recycle();
     if(portrait){
-      Matrix r=new Matrix();r.postRotate(-90);
-      Bitmap upright=Bitmap.createBitmap(combined,0,0,combined.getWidth(),combined.getHeight(),r,true);
-      combined.recycle();
-      return upright;
+      Matrix rotation=new Matrix();rotation.postRotate(-90);
+      Bitmap upright=Bitmap.createBitmap(combined,0,0,combined.getWidth(),combined.getHeight(),rotation,true);
+      combined.recycle();return upright;
     }
     return combined;
   }
