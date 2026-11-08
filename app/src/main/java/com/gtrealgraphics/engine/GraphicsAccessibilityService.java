@@ -18,6 +18,7 @@ import android.view.accessibility.AccessibilityEvent;
 public final class GraphicsAccessibilityService extends AccessibilityService {
     private static final String TARGET_GAME_PACKAGE="com.axlebolt.standoff2";
     private static volatile GraphicsAccessibilityService instance;
+    private static volatile boolean targetGameForeground;
     private WindowManager windowManager;
     private View attachedOverlay;
 
@@ -31,6 +32,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
     }
 
     public static boolean isConnected(){return instance!=null;}
+    public static boolean isTargetGameForeground(){return targetGameForeground;}
     public static Context activeContext(){GraphicsAccessibilityService s=instance;return s;}
 
     public static boolean showOverlay(View view){
@@ -83,6 +85,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
+        targetGameForeground=false;
         android.util.Log.i("GT-Accessibility","Trusted non-touchable overlay service connected; accessibility window allows pass-through");
     }
 
@@ -91,9 +94,18 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         CharSequence packageName=event.getPackageName();
         if(packageName==null)return;
         String foregroundPackage=packageName.toString();
-        if(foregroundPackage.isEmpty()||getPackageName().equals(foregroundPackage))return;
+        if(foregroundPackage.isEmpty())return;
+        if(getPackageName().equals(foregroundPackage)){
+            CharSequence className=event.getClassName();
+            if(className!=null&&className.toString().endsWith("MainActivity")){
+                targetGameForeground=false;
+                GraphicsCaptureService.setGameForeground(false);
+            }
+            return;
+        }
         // Read only the foreground package name; never retrieve window text or view content.
-        GraphicsCaptureService.setGameForeground(TARGET_GAME_PACKAGE.equals(foregroundPackage));
+        targetGameForeground=TARGET_GAME_PACKAGE.equals(foregroundPackage);
+        GraphicsCaptureService.setGameForeground(targetGameForeground);
     }
 
     @Override public void onInterrupt(){}
