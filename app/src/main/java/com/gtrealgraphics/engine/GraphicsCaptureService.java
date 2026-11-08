@@ -74,6 +74,7 @@ public final class GraphicsCaptureService extends Service {
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
             overlay.setFrameAvailableListener(this::recordFrame);
             overlay.setFrameRenderedListener(this::recordRenderedFrame);
+            overlay.setRendererErrorListener(this::onRendererError);
             addOverlay();
 
             projectionCallback=new MediaProjection.Callback(){
@@ -115,6 +116,12 @@ public final class GraphicsCaptureService extends Service {
         s.vignette=p.getFloat("vignette",s.vignette);
         s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);
         return s;
+    }
+
+    private void onRendererError(String message){
+        Log.e(TAG,"GPU renderer unavailable: "+message);
+        updateNotification("GPU initialization failed: "+message);
+        stopSelf();
     }
 
     private void onInputSurfaceReady(Surface surface){
