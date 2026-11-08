@@ -14,6 +14,9 @@ import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
@@ -39,6 +42,9 @@ public final class GraphicsCaptureService extends Service {
     private long fpsWindowStart;
     private int inputFramesInWindow,renderedFramesInWindow,inputFps,renderFps;
     private volatile String rendererInfo="GLES3";
+    private final Handler mainHandler=new Handler(Looper.getMainLooper());
+    private volatile long lastInputFrameUptimeMs;
+    private Runnable visibilityRecheck;
     private volatile boolean shuttingDown;
 
     public static void updateSettings(GpuPostProcessor.Settings settings){
@@ -95,7 +101,23 @@ public final class GraphicsCaptureService extends Service {
                     Log.i(TAG,"Captured app resized to "+width+"x"+height);
                 }
                 @Override public void onCapturedContentVisibilityChanged(boolean visible){
-                    if(overlay!=null)overlay.post(()->overlay.setVisibility(visible?android.view.View.VISIBLE:android.view.View.INVISIBLE));
+                    Log.i(TAG,"Captured app visibility="+visible+"; checking frame flow before hiding overlay");
+                    if(visible){
+                        if(visibilityRecheck!=null)mainHandler.removeCallbacks(visibilityRecheck);
+                        if(overlay!=null)overlay.setVisibility(android.view.View.VISIBLE);
+                    }else{
+                        if(visibilityRecheck!=null)mainHandler.removeCallbacks(visibilityRecheck);
+                        visibilityRecheck=()->{
+                            long frameAge=SystemClock.uptimeMillis()-lastInputFrameUptimeMs;
+                            if(overlay!=null){
+                                // The output window covers the selected app. Keep it visible while
+                                // fresh frames arrive to avoid a visibility feedback/flicker loop.
+                                overlay.setVisibility(frameAge>1000?android.view.View.INVISIBLE:android.view.View.VISIBLE);
+                                Log.i(TAG,"Visibility recheck: last input frame "+frameAge+" ms ago");
+                            }
+                        };
+                        mainHandler.postDelayed(visibilityRecheck,1200);
+                    }
                 }
             };
             projection.registerCallback(projectionCallback,new android.os.Handler(getMainLooper()));
@@ -182,6 +204,10 @@ public final class GraphicsCaptureService extends Service {
     }
     private synchronized void recordFrame(){
         if(shuttingDown)return;
+        lastInputFrameUptimeMs=SystemClock.uptimeMillis();
+        if(overlay!=null&&overlay.getVisibility()!=android.view.View.VISIBLE){
+            overlay.post(()->{if(overlay!=null)overlay.setVisibility(android.view.View.VISIBLE);});
+        }
         inputFramesInWindow++;
         publishFrameStats();
     }
@@ -211,6 +237,7 @@ public final class GraphicsCaptureService extends Service {
 
     @Override public void onDestroy(){
         shuttingDown=true;activeInstance=null;
+        if(visibilityRecheck!=null)mainHandler.removeCallbacks(visibilityRecheck);
         if(virtualDisplay!=null){virtualDisplay.release();virtualDisplay=null;}
         if(projection!=null){
             try{if(projectionCallback!=null)projection.unregisterCallback(projectionCallback);}catch(Exception ignored){}
