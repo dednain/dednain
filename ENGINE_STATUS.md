@@ -9,7 +9,7 @@ Development branch: `gt-real-graphics-engine`
 - Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
 - sRGB decode/encode, linear-light grading, RGBA16F intermediate buffers when half-float color-buffer support exists (RGBA8 fallback), final ACES-style tone mapping, exposure, contrast, saturation, temperature, shadow lift, local contrast, bloom, sharpening and vignette.
 - 50–100% render-scale control and Natural/Cinematic/Competitive profiles.
-- Foreground notification with separate input capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
+- Foreground notification with GPU renderer / RGBA16F capability, separate input capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
 - Saved settings and capture-resize handling.
 
 ## Not implemented / not claimed
