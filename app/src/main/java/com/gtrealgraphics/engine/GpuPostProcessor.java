@@ -20,6 +20,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private static final String TAG="GT-GPU";
     public interface SurfaceReadyListener { void onSurfaceReady(Surface surface); }
     public interface FrameAvailableListener { void onFrameAvailable(); }
+    public interface FrameRenderedListener { void onFrameRendered(); }
 
     private static final String VERTEX=
         "#version 300 es\nlayout(location=0) in vec2 aPosition;\nlayout(location=1) in vec2 aTexCoord;\nout vec2 vUv;\nvoid main(){gl_Position=vec4(aPosition,0.0,1.0);vUv=aTexCoord;}\n";
@@ -57,6 +58,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private Runnable renderRequest;
     private SurfaceReadyListener surfaceReadyListener;
     private FrameAvailableListener frameAvailableListener;
+    private FrameRenderedListener frameRenderedListener;
     private SurfaceTexture inputTexture;
     private Surface inputSurface;
     private int externalTexture;
@@ -72,6 +74,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     public void setRenderRequest(Runnable r){renderRequest=r;}
     public void setSurfaceReadyListener(SurfaceReadyListener l){surfaceReadyListener=l;}
     public void setFrameAvailableListener(FrameAvailableListener l){frameAvailableListener=l;}
+    public void setFrameRenderedListener(FrameRenderedListener l){frameRenderedListener=l;}
     public void setSettings(Settings s){if(s!=null)settings=s.copy();}
     public void setCaptureSize(int w,int h){if(w<=0||h<=0)return;requestedWidth=w;requestedHeight=h;SurfaceTexture st=inputTexture;if(st!=null){try{st.setDefaultBufferSize(w,h);}catch(Exception ignored){}}Runnable r=renderRequest;if(r!=null)r.run();}
     public void releaseGlResources(){released=true;if(inputTexture!=null){try{inputTexture.setOnFrameAvailableListener(null);inputTexture.release();}catch(Exception ignored){}inputTexture=null;}if(inputSurface!=null){try{inputSurface.release();}catch(Exception ignored){}inputSurface=null;}deleteTexture(externalTexture);deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);if(sceneProgram!=0)GLES30.glDeleteProgram(sceneProgram);if(brightProgram!=0)GLES30.glDeleteProgram(brightProgram);if(blurProgram!=0)GLES30.glDeleteProgram(blurProgram);if(finalProgram!=0)GLES30.glDeleteProgram(finalProgram);sceneProgram=brightProgram=blurProgram=finalProgram=0;}
@@ -103,7 +106,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightProgram,"uScene");u2(brightProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(brightProgram,"uThreshold",s.bloomThreshold);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurProgram,"uTexture");u2(blurProgram,"uDirection",1f/bloomWidth,0);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurProgram,"uTexture");u2(blurProgram,"uDirection",0,1f/bloomHeight);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalProgram,"uScene");bind2D(1,bloomTextureA,finalProgram,"uBloom");u2(finalProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(finalProgram,"uBloomStrength",s.bloom);u1(finalProgram,"uSharpness",s.sharpness);u1(finalProgram,"uVignette",s.vignette);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalProgram,"uScene");bind2D(1,bloomTextureA,finalProgram,"uBloom");u2(finalProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(finalProgram,"uBloomStrength",s.bloom);u1(finalProgram,"uSharpness",s.sharpness);u1(finalProgram,"uVignette",s.vignette);draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
     }
     private void bindExternal(){GLES30.glActiveTexture(GLES30.GL_TEXTURE0);GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,externalTexture);GLES30.glUniform1i(loc(sceneProgram,"uInput"),0);}
     private void bind2D(int unit,int texture,int p,String sampler){GLES30.glActiveTexture(GLES30.GL_TEXTURE0+unit);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,texture);GLES30.glUniform1i(loc(p,sampler),unit);}
