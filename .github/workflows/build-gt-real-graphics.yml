@@ -31,6 +31,13 @@ jobs:
           gradle-version: '8.9'
       - name: Compile Android app
         run: gradle --no-daemon :app:assembleDebug
+      - name: Verify APK package and signature
+        run: |
+          APK='app/build/outputs/apk/debug/app-debug.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -v 4 "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -n 5
       - uses: actions/upload-artifact@v4
         if: success()
         with:
