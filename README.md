@@ -1,27 +1,32 @@
-# GT Real Graphics Engine — Android alpha
+# GT Real Graphics Engine — GPU-native alpha
 
-A standalone Android 14+ GPU post-processing overlay prototype targeting the Infinix GT 20 Pro.
+Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 
-## Implemented in this first build
-- Android MediaProjection user-choice capture. In the system picker, choose Standoff 2 as a **single app window**, not the entire display.
-- OpenGL ES 3.0 GPU fragment-shader pipeline.
-- RGBA frame upload to a persistent GPU texture.
-- Live controls: saturation, contrast, exposure, HDR-look tone mapping, bloom-like glow, edge sharpening and shadow-detail lift.
-- A separate, non-touchable overlay window with a foreground notification and Stop action.
-- Capture-size change handling and a small reusable frame-buffer pool.
-- No INTERNET permission. No Standoff 2 APK, source, assets, process injection or game-file changes.
+## Current implementation
+- Android 14 MediaProjection app-window selection flow. Choose Standoff 2 as a single app window.
+- GPU-native capture: MediaProjection VirtualDisplay writes directly to a Surface backed by SurfaceTexture / OpenGL ES external texture. The current path avoids ImageReader-to-Java-RGBA copies and per-frame CPU texture uploads.
+- GLES 3.0 multi-pass renderer:
+  1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature, shadow lift and filmic/ACES-style highlight roll-off.
+  2. Quarter-resolution bright-pass extraction with adjustable threshold.
+  3. Horizontal and vertical Gaussian bloom blur.
+  4. Final composite with bloom, edge sharpening, vignette and sRGB output transfer.
+- Adjustable 50–100% GPU render resolution for performance/quality tuning.
+- Natural, Cinematic and Competitive starting profiles.
+- Foreground notification with capture input FPS telemetry and Stop action.
+- App-window resize handling and settings persistence.
+- No INTERNET permission, game APK modification, game asset replacement, process injection or anti-cheat bypass.
 
-## What this is not
-This is not a graphics driver, DLSS, a replacement game renderer or a true HDR pipeline. MediaProjection gives the app rendered pixels only; it does not expose the game's depth buffer, normals, geometry, materials, motion vectors or light sources. Therefore the current shader cannot create physically correct new dynamic shadows, true geometric reflections, new player/weapon models or missing HDR highlight information. The controls are image-space approximations.
+## Important limitations
+This is a screen-space image processor, not a replacement game renderer, graphics driver, DLSS implementation or true HDR output pipeline. MediaProjection exposes rendered pixels, not the game's depth buffer, normals, geometry, materials, motion vectors or light sources. The current build cannot create physically correct new dynamic 3D shadows, true ray-traced reflections, new geometry or missing highlight data. Shadow lift, local contrast, bloom and filmic tone mapping are post-processing approximations. Bloom is a real multi-pass Gaussian image-space effect; it is not a new light source.
 
-The screen capture path includes Android capture, frame copying and a separate overlay. It is not guaranteed to sustain 144 processed FPS. A 144 Hz display and 144 newly captured/processed frames per second are different. FPS is measured in the service notification; actual performance must be tested on the phone. Select only Standoff 2 in Android's single-app capture picker. Selecting the entire display can capture the overlay again.
+The 144 Hz display refresh rate does not guarantee 144 captured or processed frames per second. The notification reports incoming capture-frame rate, not a certified GPU render FPS. The actual performance, thermals, visual quality, external-texture extension support and overlay compatibility must be tested on the physical device. No physical-device test has yet been performed.
 
-The app requests the standard Android screen-capture consent and draw-over-other-apps permission. It does not suppress system prompts or bypass DRM/secure surfaces.
+Select only the Standoff 2 app window in Android's system capture picker. Full-display capture may include the overlay and cause recursion. Android's standard screen-capture consent and draw-over-other-apps permission remain required.
 
 ## Build
-GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles the debug APK and uploads the artifact "GT-Real-Graphics-Engine-APK".
+GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK and uploads the artifact "GT-Real-Graphics-Engine-APK".
 
 ## Target
 - Android 14+ (API 34)
-- OpenGL ES 3.0
-- Infinix GT 20 Pro is the intended test device; no on-device validation has yet been performed.
+- OpenGL ES 3.0 and external-image ESSL3 extension
+- Intended device: Infinix GT 20 Pro
