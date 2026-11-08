@@ -102,6 +102,16 @@ public final class GraphicsCaptureService extends Service {
             densityDpi = metrics.densityDpi;
 
             overlay = new GraphicsOverlay(this);
+            android.content.SharedPreferences prefs = getSharedPreferences("gt_graphics", MODE_PRIVATE);
+            GpuPostProcessor.Settings initial = GpuPostProcessor.Settings.defaults();
+            initial.saturation = prefs.getFloat("saturation", initial.saturation);
+            initial.contrast = prefs.getFloat("contrast", initial.contrast);
+            initial.exposure = prefs.getFloat("exposure", initial.exposure);
+            initial.hdrLook = prefs.getFloat("hdrLook", initial.hdrLook);
+            initial.bloom = prefs.getFloat("bloom", initial.bloom);
+            initial.sharpness = prefs.getFloat("sharpness", initial.sharpness);
+            initial.shadowLift = prefs.getFloat("shadowLift", initial.shadowLift);
+            overlay.setSettings(initial);
             addOverlay();
 
             projection.registerCallback(new MediaProjection.Callback() {
