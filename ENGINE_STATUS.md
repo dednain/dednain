@@ -2,9 +2,12 @@
 
 Development branch: `gt-real-graphics-engine`
 
+Current version: `0.3.1-alpha`
+
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
 - Android 14 MediaProjection single-app capture consent.
+- Trusted non-touchable accessibility overlay with full cutout coverage and foreground-package visibility handling.
 - Direct VirtualDisplay -> SurfaceTexture -> GLES external texture input (GPU-native frame path).
 - Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
 - sRGB decode/encode, linear-light grading, RGBA16F intermediate buffers when half-float color-buffer support exists (RGBA8 fallback), final ACES-style tone mapping, exposure, contrast, saturation, temperature, shadow lift, local contrast, bloom, sharpening and vignette.
@@ -15,7 +18,7 @@ Development branch: `gt-real-graphics-engine`
 ## Not implemented / not claimed
 - Access to the game's depth buffer, normals, geometry, materials or light sources.
 - Physically correct dynamic 3D shadows, ray-traced reflections, ray tracing, path tracing, true HDR10 output, AI super-resolution, frame generation or 144 FPS guarantee.
-- Physical Infinix GT 20 Pro runtime validation.
+- Physical Infinix GT 20 Pro runtime validation, including confirmation that Standoff 2 touch controls pass through and no capture feedback/ghosting remains.
 
 ## Next validation gates
 1. Build a fresh APK in CI.
