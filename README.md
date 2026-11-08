@@ -4,7 +4,7 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 
 ## Current implementation
 - Android 14 MediaProjection app-window selection flow. Choose Standoff 2 as a single app window.
-- Opaque trusted `TYPE_ACCESSIBILITY_OVERLAY` window with `FLAG_NOT_TOUCHABLE` and `FLAG_NOT_TOUCH_MODAL`, so Android 12+ allows game touches to pass through. The accessibility service reads only the foreground package name to show the overlay for Standoff 2 and hide it in other apps; it does not retrieve window content or perform gestures. The user must explicitly enable it in Android Accessibility settings.
+- Opaque trusted `TYPE_ACCESSIBILITY_OVERLAY` window with `FLAG_NOT_TOUCHABLE` and `FLAG_NOT_TOUCH_MODAL`, so Android 12+ allows game touches to pass through. The accessibility service reads only the foreground package name to show the overlay for Standoff 2 and make it transparent in other apps without destroying the GPU surface; it does not retrieve window content or perform gestures. The user must explicitly enable it in Android Accessibility settings.
 - GPU-native capture: MediaProjection VirtualDisplay writes directly to a Surface backed by SurfaceTexture / OpenGL ES external texture. The current path avoids ImageReader-to-Java-RGBA copies and per-frame CPU texture uploads.
 - GLES 3.0 multi-pass renderer:
   1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature and shadow lift.
