@@ -62,7 +62,7 @@ public final class MainActivity extends Activity {
         cinematic.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.cinematic(),"Кинематографический профиль"));
         competitive.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.competitive(),"Соревновательный профиль"));
 
-        heading("ТОНАЛЬНАЯ СТИЛИЗАЦИЯ");
+        heading("КАЧЕСТВО / ПРОИЗВОДИТЕЛЬНОСТЬ");\n        slider("Разрешение GPU-проходов",50,100,Math.round(settings.renderScale*100),v->settings.renderScale=v/100f);\n\n        heading("ТОНАЛЬНАЯ СТИЛИЗАЦИЯ");
         slider("Экспозиция",70,135,Math.round(settings.exposure*100),v->settings.exposure=v/100f);
         slider("Контраст",75,145,Math.round(settings.contrast*100),v->settings.contrast=v/100f);
         slider("Насыщенность",70,150,Math.round(settings.saturation*100),v->settings.saturation=v/100f);
@@ -102,7 +102,7 @@ public final class MainActivity extends Activity {
         s.saturation=p.getFloat("saturation",s.saturation);s.contrast=p.getFloat("contrast",s.contrast);s.exposure=p.getFloat("exposure",s.exposure);
         s.hdrLook=p.getFloat("hdrLook",s.hdrLook);s.bloom=p.getFloat("bloom",s.bloom);s.sharpness=p.getFloat("sharpness",s.sharpness);
         s.shadowLift=p.getFloat("shadowLift",s.shadowLift);s.localContrast=p.getFloat("localContrast",s.localContrast);s.temperature=p.getFloat("temperature",s.temperature);
-        s.vignette=p.getFloat("vignette",s.vignette);s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);return s;
+        s.vignette=p.getFloat("vignette",s.vignette);s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);s.renderScale=p.getFloat("renderScale",s.renderScale);return s;
     }
     private void applyPreset(GpuPostProcessor.Settings s,String label){settings=s;persistAndApply();buildUi();setStatus(label+" применён.");}
     private void persistAndApply(){
@@ -110,7 +110,7 @@ public final class MainActivity extends Activity {
             .putFloat("saturation",settings.saturation).putFloat("contrast",settings.contrast).putFloat("exposure",settings.exposure)
             .putFloat("hdrLook",settings.hdrLook).putFloat("bloom",settings.bloom).putFloat("sharpness",settings.sharpness)
             .putFloat("shadowLift",settings.shadowLift).putFloat("localContrast",settings.localContrast).putFloat("temperature",settings.temperature)
-            .putFloat("vignette",settings.vignette).putFloat("bloomThreshold",settings.bloomThreshold).apply();
+            .putFloat("vignette",settings.vignette).putFloat("bloomThreshold",settings.bloomThreshold).putFloat("renderScale",settings.renderScale).apply();
         GraphicsCaptureService.updateSettings(settings);
     }
     private void setStatus(String message){if(status!=null)status.setText("Статус: "+message);}
