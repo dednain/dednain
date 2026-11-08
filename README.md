@@ -13,7 +13,7 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
   5. Final composite with bloom, edge sharpening, vignette and sRGB output transfer.
 - Adjustable 50–100% GPU render resolution for performance/quality tuning.
 - Natural, Cinematic and Competitive starting profiles.
-- Foreground notification with separate incoming capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
+- Foreground notification with GPU renderer name, RGBA16F availability, separate incoming capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
 - App-window resize handling and settings persistence.
 - No INTERNET permission, game APK modification, game asset replacement, process injection or anti-cheat bypass.
 
