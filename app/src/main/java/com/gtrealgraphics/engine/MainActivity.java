@@ -11,217 +11,131 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
-
 import java.util.function.IntConsumer;
 
 public final class MainActivity extends Activity {
-    private static final int REQUEST_OVERLAY = 4101;
-    private static final int REQUEST_CAPTURE = 4102;
-    private GpuPostProcessor.Settings settings = GpuPostProcessor.Settings.defaults();
+    private static final int REQUEST_OVERLAY=4101,REQUEST_CAPTURE=4102;
+    private GpuPostProcessor.Settings settings=GpuPostProcessor.Settings.defaults();
     private TextView status;
+    private LinearLayout root;
 
-    @Override protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(8, 16, 29));
-        getWindow().setNavigationBarColor(Color.rgb(8, 16, 29));
+    @Override protected void onCreate(Bundle state){
+        super.onCreate(state);
+        getWindow().setStatusBarColor(Color.rgb(7,13,24));
+        getWindow().setNavigationBarColor(Color.rgb(7,13,24));
+        settings=loadSettings();
         buildUi();
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 77);
-        }
+        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},77);
     }
-
-    private int dp(float value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+    private int dp(float v){return Math.round(v*getResources().getDisplayMetrics().density);}
+    private TextView text(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(0,dp(4),0,dp(6));return t;}
+    private void heading(String s){TextView t=text(s,16,0xffedf4ff);t.setTypeface(null,1);t.setPadding(0,dp(20),0,dp(7));root.addView(t);}
+    private Button button(String s,boolean primary){
+        Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(0xfff4fbff);
+        b.setBackgroundTintList(ColorStateList.valueOf(primary?0xff147b83:0xff26384c));
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,dp(50));p.topMargin=dp(7);b.setLayoutParams(p);return b;
     }
+    private void buildUi(){
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
+        root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(19),dp(22),dp(19),dp(32));root.setBackgroundColor(0xff07101e);scroll.addView(root);
+        TextView title=text("GT REAL GRAPHICS ENGINE",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
+        TextView tag=text("REAL-TIME GPU PIPELINE  •  GLES 3.0  •  ANDROID 14+",10,0xff58e1c4);root.addView(tag);
+        TextView intro=text("GPU-native захват выбранного окна без копирования каждого кадра в Java. Пять проходов обработки: тональная стилизация, выделение света, Gaussian bloom и финальная композиция.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
 
-    private void buildUi() {
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(22), dp(20), dp(30));
-        root.setBackgroundColor(Color.rgb(8, 16, 29));
-        scroll.addView(root);
+        Button start=button("ЗАПУСТИТЬ ОБРАБОТКУ",true);root.addView(start);start.setOnClickListener(v->startCaptureFlow());
+        Button stop=button("ОСТАНОВИТЬ",false);root.addView(stop);stop.setOnClickListener(v->{stopService(new Intent(this,GraphicsCaptureService.class));setStatus("Обработка остановлена.");});
 
-        TextView title = text("GT REAL GRAPHICS ENGINE", 25, 0xfff0f6ff);
-        title.setTypeface(null, 1);
-        root.addView(title);
-        TextView subtitle = text("GPU SCREEN POST-PROCESSOR • ANDROID 14+", 11, 0xff55dfc2);
-        subtitle.setPadding(0, dp(5), 0, dp(14));
-        root.addView(subtitle);
+        heading("ПРОФИЛИ ИЗОБРАЖЕНИЯ");
+        LinearLayout presets=new LinearLayout(this);presets.setOrientation(LinearLayout.HORIZONTAL);root.addView(presets);
+        Button natural=smallButton("NATURAL");Button cinematic=smallButton("CINEMATIC");Button competitive=smallButton("COMPETITIVE");
+        presets.addView(natural,new LinearLayout.LayoutParams(0,dp(46),1));presets.addView(cinematic,new LinearLayout.LayoutParams(0,dp(46),1));presets.addView(competitive,new LinearLayout.LayoutParams(0,dp(46),1));
+        natural.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.defaults(),"Натуральный профиль"));
+        cinematic.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.cinematic(),"Кинематографический профиль"));
+        competitive.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.competitive(),"Соревновательный профиль"));
 
-        TextView description = text(
-            "Отдельный GPU-конвейер для обработки выбранного окна игры. Игровые файлы Standoff 2 не меняются.",
-            14, 0xffb8c6d8);
-        root.addView(description);
+        heading("ТОНАЛЬНАЯ СТИЛИЗАЦИЯ");
+        slider("Экспозиция",70,135,Math.round(settings.exposure*100),v->settings.exposure=v/100f);
+        slider("Контраст",75,145,Math.round(settings.contrast*100),v->settings.contrast=v/100f);
+        slider("Насыщенность",70,150,Math.round(settings.saturation*100),v->settings.saturation=v/100f);
+        slider("HDR look / filmic roll-off",0,70,Math.round(settings.hdrLook*100),v->settings.hdrLook=v/100f);
+        slider("Цветовая температура", -20,20,Math.round(settings.temperature*100),v->settings.temperature=v/100f);
 
-        Button start = button("ЗАПУСТИТЬ ДЛЯ STANDOFF 2");
-        root.addView(start);
-        start.setOnClickListener(v -> startCaptureFlow());
+        heading("СВЕТОВЫЕ ЭФФЕКТЫ");
+        slider("Bloom strength",0,80,Math.round(settings.bloom*100),v->settings.bloom=v/100f);
+        slider("Порог свечения",40,100,Math.round(settings.bloomThreshold*100),v->settings.bloomThreshold=v/100f);
+        slider("Vignette",0,40,Math.round(settings.vignette*100),v->settings.vignette=v/100f);
 
-        Button stop = button("ОСТАНОВИТЬ ОБРАБОТКУ");
-        root.addView(stop);
-        stop.setOnClickListener(v -> {
-            stopService(new Intent(this, GraphicsCaptureService.class));
-            status.setText("Обработка остановлена.");
-        });
+        heading("ДЕТАЛИ И ЛОКАЛЬНЫЙ КОНТРАСТ");
+        slider("Резкость",0,50,Math.round(settings.sharpness*100),v->settings.sharpness=v/100f);
+        slider("Локальный контраст",0,40,Math.round(settings.localContrast*100),v->settings.localContrast=v/100f);
+        slider("Подъём деталей в тенях",0,20,Math.round(settings.shadowLift*100),v->settings.shadowLift=v/100f);
 
-        heading(root, "НАСТРОЙКИ GPU");
-        addSlider(root, "Насыщенность", 50, 160, 112,
-            v -> settings.saturation = v / 100f);
-        addSlider(root, "Контраст", 70, 140, 108,
-            v -> settings.contrast = v / 100f);
-        addSlider(root, "Экспозиция", 70, 140, 103,
-            v -> settings.exposure = v / 100f);
-        addSlider(root, "HDR LOOK (тональная стилизация)", 0, 100, 18,
-            v -> settings.hdrLook = v / 100f);
-        addSlider(root, "Bloom / свечение", 0, 80, 18,
-            v -> settings.bloom = v / 100f);
-        addSlider(root, "Чёткость деталей", 0, 80, 22,
-            v -> settings.sharpness = v / 100f);
-        addSlider(root, "Осветление деталей в тенях", 0, 30, 8,
-            v -> settings.shadowLift = v / 100f);
-
-        TextView note = text(
-            "Важно: в системном окне захвата выбери именно Standoff 2 (одно приложение), а не весь экран. " +
-            "Тогда наше наложение не должно попадать обратно в захват.",
-            13, 0xffffd28a);
-        note.setPadding(0, dp(16), 0, dp(8));
-        root.addView(note);
-
-        TextView limits = text(
-            "Это GPU-постобработка изображения, а не замена игрового движка. Она создаёт HDR-подобную тональную стилизацию, " +
-            "свечение и повышение локальной чёткости. Настоящие новые 3D-тени, геометрические отражения и 144 обработанных FPS " +
-            "не гарантируются: Android не передаёт приложению глубину, нормали и игровые источники света.",
-            12, 0xff8fa3ba);
-        root.addView(limits);
-
-        status = text("Готово. Для запуска нужны разрешение на отображение поверх других приложений и системное разрешение захвата.", 13, 0xff69e1c4);
-        status.setPadding(0, dp(16), 0, 0);
-        root.addView(status);
+        heading("ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ");
+        TextView note=text("Захват передаётся прямо в SurfaceTexture и обрабатывается на GPU. Bloom построен как отдельный quarter-resolution pass с Gaussian blur по двум осям. FPS в уведомлении показывает частоту поступления кадров захвата, а не гарантированную частоту дисплея.",12,0xffaabbd0);root.addView(note);
+        TextView limits=text("Это улучшает уже отрисованную картинку. Настоящие 3D-тени, ray-traced reflections и геометрическую глубину нельзя восстановить из обычного экранного изображения. Shadow lift и локальный контраст — приближённые image-space эффекты, не новые игровые тени.",12,0xffffd08c);limits.setPadding(0,dp(8),0,0);root.addView(limits);
+        status=text("Статус: готов к запуску. Разреши отображение поверх приложений и выбери Standoff 2 в системном окне захвата.",12,0xff62e2c5);status.setPadding(0,dp(18),0,0);root.addView(status);
         setContentView(scroll);
     }
-
-    private TextView text(String value, int size, int color) {
-        TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextSize(size);
-        t.setTextColor(color);
-        t.setPadding(0, dp(4), 0, dp(6));
-        return t;
-    }
-
-    private void heading(LinearLayout root, String value) {
-        TextView h = text(value, 17, 0xffeaf2ff);
-        h.setTypeface(null, 1);
-        h.setPadding(0, dp(20), 0, dp(5));
-        root.addView(h);
-    }
-
-    private Button button(String value) {
-        Button b = new Button(this);
-        b.setText(value);
-        b.setAllCaps(false);
-        b.setTextSize(14);
-        b.setTextColor(0xfff4fbff);
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff176e78));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(54));
-        p.topMargin = dp(9);
-        b.setLayoutParams(p);
-        return b;
-    }
-
-    private void addSlider(LinearLayout root, String label, int min, int max, int initial, IntConsumer onChange) {
-        TextView caption = text(label + ": " + initial, 13, 0xffc6d3e2);
-        caption.setPadding(0, dp(12), 0, 0);
-        root.addView(caption);
-        SeekBar seek = new SeekBar(this);
-        seek.setMax(max - min);
-        seek.setProgress(initial - min);
-        root.addView(seek, new LinearLayout.LayoutParams(-1, dp(38)));
-        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                int value = min + progress;
-                caption.setText(label + ": " + value);
-                onChange.accept(value);
-                persistAndApplySettings();
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) {}
-            @Override public void onStopTrackingTouch(SeekBar bar) {}
+    private Button smallButton(String s){Button b=new Button(this);b.setText(s);b.setTextSize(10);b.setAllCaps(false);b.setTextColor(0xfff0f6ff);b.setBackgroundTintList(ColorStateList.valueOf(0xff26384c));return b;}
+    private void slider(String label,int min,int max,int initial,IntConsumer update){
+        int value=Math.max(min,Math.min(max,initial));
+        TextView caption=text(label+": "+value,12,0xffc8d5e4);caption.setPadding(0,dp(10),0,0);root.addView(caption);
+        SeekBar bar=new SeekBar(this);bar.setMax(max-min);bar.setProgress(value-min);root.addView(bar,new LinearLayout.LayoutParams(-1,dp(35)));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onProgressChanged(SeekBar b,int p,boolean fromUser){int v=min+p;caption.setText(label+": "+v);update.accept(v);persistAndApply();}
+            @Override public void onStartTrackingTouch(SeekBar b){}
+            @Override public void onStopTrackingTouch(SeekBar b){}
         });
     }
-
-    private void persistAndApplySettings() {
-        getSharedPreferences("gt_graphics", MODE_PRIVATE).edit()
-            .putFloat("saturation", settings.saturation)
-            .putFloat("contrast", settings.contrast)
-            .putFloat("exposure", settings.exposure)
-            .putFloat("hdrLook", settings.hdrLook)
-            .putFloat("bloom", settings.bloom)
-            .putFloat("sharpness", settings.sharpness)
-            .putFloat("shadowLift", settings.shadowLift)
-            .apply();
+    private GpuPostProcessor.Settings loadSettings(){
+        android.content.SharedPreferences p=getSharedPreferences("gt_graphics",MODE_PRIVATE);
+        GpuPostProcessor.Settings s=GpuPostProcessor.Settings.defaults();
+        s.saturation=p.getFloat("saturation",s.saturation);s.contrast=p.getFloat("contrast",s.contrast);s.exposure=p.getFloat("exposure",s.exposure);
+        s.hdrLook=p.getFloat("hdrLook",s.hdrLook);s.bloom=p.getFloat("bloom",s.bloom);s.sharpness=p.getFloat("sharpness",s.sharpness);
+        s.shadowLift=p.getFloat("shadowLift",s.shadowLift);s.localContrast=p.getFloat("localContrast",s.localContrast);s.temperature=p.getFloat("temperature",s.temperature);
+        s.vignette=p.getFloat("vignette",s.vignette);s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);return s;
+    }
+    private void applyPreset(GpuPostProcessor.Settings s,String label){settings=s;persistAndApply();buildUi();setStatus(label+" применён.");}
+    private void persistAndApply(){
+        getSharedPreferences("gt_graphics",MODE_PRIVATE).edit()
+            .putFloat("saturation",settings.saturation).putFloat("contrast",settings.contrast).putFloat("exposure",settings.exposure)
+            .putFloat("hdrLook",settings.hdrLook).putFloat("bloom",settings.bloom).putFloat("sharpness",settings.sharpness)
+            .putFloat("shadowLift",settings.shadowLift).putFloat("localContrast",settings.localContrast).putFloat("temperature",settings.temperature)
+            .putFloat("vignette",settings.vignette).putFloat("bloomThreshold",settings.bloomThreshold).apply();
         GraphicsCaptureService.updateSettings(settings);
     }
-
-    private void startCaptureFlow() {
-        if (Build.VERSION.SDK_INT < 34) {
-            status.setText("Для безопасного захвата одного приложения требуется Android 14 или новее.");
-            return;
-        }
-        if (!Settings.canDrawOverlays(this)) {
-            status.setText("Разреши отображение GT поверх других приложений.");
-            Intent permission = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName()));
-            startActivityForResult(permission, REQUEST_OVERLAY);
-            return;
-        }
+    private void setStatus(String message){if(status!=null)status.setText("Статус: "+message);}
+    private void startCaptureFlow(){
+        if(Build.VERSION.SDK_INT<34){setStatus("Для захвата одного приложения требуется Android 14 или новее.");return;}
+        if(!Settings.canDrawOverlays(this)){setStatus("Разреши отображение поверх других приложений.");Intent i=new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+getPackageName()));startActivityForResult(i,REQUEST_OVERLAY);return;}
         showCaptureInstructions();
     }
-
-    private void showCaptureInstructions() {
-        new AlertDialog.Builder(this)
-            .setTitle("Выбери Standoff 2")
-            .setMessage("В следующем системном окне выбери захват ОДНОГО ПРИЛОЖЕНИЯ и укажи Standoff 2. Не выбирай весь экран: иначе Android может захватить и наше графическое наложение.")
-            .setNegativeButton("Отмена", (d, w) -> {})
-            .setPositiveButton("Продолжить", (d, w) -> requestCapture())
-            .show();
+    private void showCaptureInstructions(){
+        new AlertDialog.Builder(this).setTitle("Выбери Standoff 2")
+            .setMessage("В системном окне выбери захват ОДНОГО ПРИЛОЖЕНИЯ и укажи Standoff 2. Не выбирай весь экран: иначе обработчик может захватить собственное наложение.")
+            .setNegativeButton("Отмена",(d,w)->{}).setPositiveButton("Продолжить",(d,w)->requestCapture()).show();
     }
-
-    private void requestCapture() {
-        MediaProjectionManager manager =
-            (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
-        MediaProjectionConfig config = MediaProjectionConfig.createConfigForUserChoice();
-        startActivityForResult(manager.createScreenCaptureIntent(config), REQUEST_CAPTURE);
+    private void requestCapture(){
+        MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(m.createScreenCaptureIntent(MediaProjectionConfig.createConfigForUserChoice()),REQUEST_CAPTURE);
     }
-
-    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_OVERLAY) {
-            if (Settings.canDrawOverlays(this)) showCaptureInstructions();
-            else status.setText("Разрешение на отображение поверх приложений не выдано.");
-            return;
-        }
-        if (requestCode == REQUEST_CAPTURE) {
-            if (resultCode != RESULT_OK || data == null) {
-                status.setText("Захват экрана отменён.");
-                return;
-            }
-            Intent service = new Intent(this, GraphicsCaptureService.class);
-            service.putExtra(GraphicsCaptureService.EXTRA_RESULT_CODE, resultCode);
-            service.putExtra(GraphicsCaptureService.EXTRA_RESULT_DATA, data);
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(service);
-            else startService(service);
-            status.setText("GT запущен. Проверь FPS и изображение в Standoff 2. Остановка — кнопкой выше или через уведомление.");
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==REQUEST_OVERLAY){if(Settings.canDrawOverlays(this))showCaptureInstructions();else setStatus("Разрешение на отображение поверх приложений не выдано.");return;}
+        if(requestCode==REQUEST_CAPTURE){
+            if(resultCode!=RESULT_OK||data==null){setStatus("Системный захват отменён.");return;}
+            Intent service=new Intent(this,GraphicsCaptureService.class);service.putExtra(GraphicsCaptureService.EXTRA_RESULT_CODE,resultCode);service.putExtra(GraphicsCaptureService.EXTRA_RESULT_DATA,data);
+            if(Build.VERSION.SDK_INT>=26)startForegroundService(service);else startService(service);
+            setStatus("GPU-захват запускается. FPS будет показан в уведомлении.");
         }
     }
 }
