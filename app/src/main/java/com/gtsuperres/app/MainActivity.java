@@ -84,14 +84,14 @@ public final class MainActivity extends Activity {
             decoder.setTargetSampleSize((int)Math.ceil(Math.max(size.getWidth(),size.getHeight())/2500.0));
         });
         Bitmap result;
-        try(EsrganEngine engine=new EsrganEngine(this)){ result=engine.enhance(source); }
+        try(EsrganEngine engine=new EsrganEngine(this)){ result=engine.enhancePhoto(source); }
         runOnUiThread(()->{
           if(enhanced!=null)enhanced.recycle();
           enhanced=result;
           before.setImageBitmap(source);after.setImageBitmap(result);
           before.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(155)));
           after.setLayoutParams(new LinearLayout.LayoutParams(-1,dp(295)));
-          save.setEnabled(true);status.setText("Готово: нейросеть увеличила изображение в 4 раза (320×180 → 1280×720)");
+          save.setEnabled(true);status.setText("Готово: ESRGAN обработала изображение. Результат: "+result.getWidth()+" × "+result.getHeight()+" пикселей");
         });
       }catch(Exception e){
         runOnUiThread(()->status.setText("Ошибка нейросети: "+e.getClass().getSimpleName()+": "+e.getMessage()));
