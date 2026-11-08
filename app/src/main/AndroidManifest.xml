@@ -10,7 +10,8 @@
         android:label="GT Real Graphics Engine"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="false"
-        android:largeHeap="true">
+        android:largeHeap="true"
+        android:hardwareAccelerated="true">
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize"
