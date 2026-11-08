@@ -22,6 +22,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     public interface FrameAvailableListener { void onFrameAvailable(); }
     public interface FrameRenderedListener { void onFrameRendered(); }
     public interface RendererErrorListener { void onRendererError(String message); }
+    public interface RendererInfoListener { void onRendererInfo(String info); }
 
     private static final String VERTEX=
         "#version 300 es\nlayout(location=0) in vec2 aPosition;\nlayout(location=1) in vec2 aTexCoord;\nout vec2 vUv;\nvoid main(){gl_Position=vec4(aPosition,0.0,1.0);vUv=aTexCoord;}\n";
@@ -61,6 +62,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private FrameAvailableListener frameAvailableListener;
     private FrameRenderedListener frameRenderedListener;
     private RendererErrorListener rendererErrorListener;
+    private RendererInfoListener rendererInfoListener;
     private SurfaceTexture inputTexture;
     private Surface inputSurface;
     private int externalTexture;
@@ -81,6 +83,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     public void setFrameAvailableListener(FrameAvailableListener l){frameAvailableListener=l;}
     public void setFrameRenderedListener(FrameRenderedListener l){frameRenderedListener=l;}
     public void setRendererErrorListener(RendererErrorListener l){rendererErrorListener=l;}
+    public void setRendererInfoListener(RendererInfoListener l){rendererInfoListener=l;}
     public void setSettings(Settings s){if(s!=null)settings=s.copy();}
     public void setCaptureSize(int w,int h){if(w<=0||h<=0)return;requestedWidth=w;requestedHeight=h;SurfaceTexture st=inputTexture;if(st!=null){try{st.setDefaultBufferSize(w,h);}catch(Exception ignored){}}Runnable r=renderRequest;if(r!=null)r.run();}
     public void releaseGlResources(){released=true;if(inputTexture!=null){try{inputTexture.setOnFrameAvailableListener(null);inputTexture.release();}catch(Exception ignored){}inputTexture=null;}if(inputSurface!=null){try{inputSurface.release();}catch(Exception ignored){}inputSurface=null;}deleteTexture(externalTexture);deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);if(sceneProgram!=0)GLES30.glDeleteProgram(sceneProgram);if(brightProgram!=0)GLES30.glDeleteProgram(brightProgram);if(blurProgram!=0)GLES30.glDeleteProgram(blurProgram);if(finalProgram!=0)GLES30.glDeleteProgram(finalProgram);sceneProgram=brightProgram=blurProgram=finalProgram=0;}
@@ -112,7 +115,10 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
             inputTexture.setOnFrameAvailableListener(st->{framePending.set(true);FrameAvailableListener fl=frameAvailableListener;if(fl!=null)fl.onFrameAvailable();Runnable r=renderRequest;if(r!=null)r.run();},mainHandler);
             inputSurface=new Surface(inputTexture);targetsReady=false;ensureTargets(requestedWidth,requestedHeight);
             SurfaceReadyListener l=surfaceReadyListener;Surface s=inputSurface;if(l!=null)mainHandler.post(()->{if(!released&&surfaceReadyListener!=null)surfaceReadyListener.onSurfaceReady(s);});
-            Log.i(TAG,"GPU: "+GLES30.glGetString(GLES30.GL_RENDERER)+" / "+GLES30.glGetString(GLES30.GL_VERSION));
+            String info=GLES30.glGetString(GLES30.GL_RENDERER)+" / "+GLES30.glGetString(GLES30.GL_VERSION)+" / RGBA16F "+(rgba16fSupported?"ON":"OFF");
+            Log.i(TAG,"GPU: "+info);
+            RendererInfoListener infoListener=rendererInfoListener;
+            if(infoListener!=null)mainHandler.post(()->infoListener.onRendererInfo(info));
         }catch(Throwable error){
             Log.e(TAG,"GPU renderer initialization failed",error);
             RendererErrorListener listener=rendererErrorListener;
