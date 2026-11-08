@@ -16,6 +16,7 @@ import android.view.accessibility.AccessibilityEvent;
  * It does not inspect window content, perform gestures, or consume touch input.
  */
 public final class GraphicsAccessibilityService extends AccessibilityService {
+    private static final String TARGET_GAME_PACKAGE="com.axlebolt.standoff2";
     private static volatile GraphicsAccessibilityService instance;
     private WindowManager windowManager;
     private View attachedOverlay;
@@ -86,7 +87,13 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
-        // Intentionally no screen/window content inspection.
+        if(event==null||event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
+        CharSequence packageName=event.getPackageName();
+        if(packageName==null)return;
+        String foregroundPackage=packageName.toString();
+        if(foregroundPackage.isEmpty()||getPackageName().equals(foregroundPackage))return;
+        // Read only the foreground package name; never retrieve window text or view content.
+        GraphicsCaptureService.setGameForeground(TARGET_GAME_PACKAGE.equals(foregroundPackage));
     }
 
     @Override public void onInterrupt(){}
