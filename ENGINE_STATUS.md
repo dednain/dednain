@@ -7,7 +7,7 @@ Current version: `0.3.1-alpha`
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
 - Android 14 MediaProjection single-app capture consent.
-- Trusted non-touchable accessibility overlay with full cutout coverage and foreground-package visibility handling.
+- Trusted non-touchable accessibility overlay with full cutout coverage and foreground-package alpha switching (surface stays alive when transparent).
 - Direct VirtualDisplay -> SurfaceTexture -> GLES external texture input (GPU-native frame path).
 - Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
 - sRGB decode/encode, linear-light grading, RGBA16F intermediate buffers when half-float color-buffer support exists (RGBA8 fallback), final ACES-style tone mapping, exposure, contrast, saturation, temperature, shadow lift, local contrast, bloom, sharpening and vignette.
