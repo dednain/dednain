@@ -8,7 +8,6 @@ Development branch: `gt-real-graphics-engine`
 - Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
 - sRGB decode/encode, filmic highlight roll-off, exposure, contrast, saturation, temperature, shadow lift, local contrast, bloom, sharpening and vignette.
 - 50–100% render-scale control and Natural/Cinematic/Competitive profiles.
-- Natural, Cinematic and Competitive profiles.
 - Foreground notification with separate input capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
 - Saved settings and capture-resize handling.
 
