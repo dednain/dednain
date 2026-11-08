@@ -3,6 +3,7 @@ package com.gtrealgraphics.engine;
 import android.accessibilityservice.AccessibilityService;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.provider.Settings;
 import android.view.Gravity;
