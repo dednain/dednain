@@ -212,8 +212,9 @@ public final class GraphicsCaptureService extends Service {
             projection=null;
         }
         if(overlay!=null&&windowManager!=null){
+            try{overlay.releaseRenderer();}catch(Exception ignored){}
             try{windowManager.removeViewImmediate(overlay);}catch(Exception ignored){}
-            overlay.releaseRenderer();overlay=null;
+            overlay=null;
         }
         if(captureSurface!=null){try{captureSurface.release();}catch(Exception ignored){}captureSurface=null;}
         stopForeground(STOP_FOREGROUND_REMOVE);
