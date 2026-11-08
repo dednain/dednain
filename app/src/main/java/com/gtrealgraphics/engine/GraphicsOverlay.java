@@ -10,9 +10,9 @@ public final class GraphicsOverlay extends GLSurfaceView {
 
     public GraphicsOverlay(Context context) {
         super(context);
-        getHolder().setFormat(PixelFormat.TRANSLUCENT);
+        getHolder().setFormat(PixelFormat.OPAQUE);
         setEGLContextClientVersion(3);
-        setEGLConfigChooser(8, 8, 8, 8, 0, 0);
+        setEGLConfigChooser(8, 8, 8, 0, 0, 0);
         setZOrderOnTop(true);
         processor = new GpuPostProcessor(context);
         processor.setRenderRequest(this::requestRender);
