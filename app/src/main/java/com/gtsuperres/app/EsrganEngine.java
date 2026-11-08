@@ -63,7 +63,7 @@ public final class EsrganEngine implements Closeable {
     return result;
   }
   /**
-   * Process image in overlapping-scene tiles rather than shrinking
+   * Process image in scene tiles rather than shrinking
    * an entire 1080p screenshot into a 320x180 input. Tiled 4x AI
    * maintains substantially more scene detail on high-res photos.
    */
@@ -78,7 +78,9 @@ public final class EsrganEngine implements Closeable {
     int w=rotated.getWidth(),h=rotated.getHeight();
     int columns=Math.max(1,Math.min(4,(w+599)/600));
     int rows=Math.max(1,Math.min(3,(h+359)/360));
-    Bitmap combined=Bitmap.createBitmap(columns*OUT_W,rows*OUT_H,Bitmap.Config.ARGB_8888);
+    float scale=(float)Math.min((columns*(double)OUT_W)/w,(rows*(double)OUT_H)/h);
+    int targetW=Math.max(2,Math.round(w*scale)),targetH=Math.max(2,Math.round(h*scale));
+    Bitmap combined=Bitmap.createBitmap(targetW,targetH,Bitmap.Config.ARGB_8888);
     android.graphics.Canvas canvas=new android.graphics.Canvas(combined);
     android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
     for(int row=0;row<rows;row++){
@@ -87,7 +89,10 @@ public final class EsrganEngine implements Closeable {
         int y0=h*row/rows,y1=h*(row+1)/rows;
         Bitmap tile=Bitmap.createBitmap(rotated,x0,y0,x1-x0,y1-y0);
         Bitmap enhancedTile=enhance(tile);
-        canvas.drawBitmap(enhancedTile,col*OUT_W,row*OUT_H,paint);
+        android.graphics.Rect dest=new android.graphics.Rect(
+          Math.round((float)col*targetW/columns),Math.round((float)row*targetH/rows),
+          Math.round((float)(col+1)*targetW/columns),Math.round((float)(row+1)*targetH/rows));
+        canvas.drawBitmap(enhancedTile,null,dest,paint);
         enhancedTile.recycle();tile.recycle();
       }
     }
