@@ -149,7 +149,7 @@ public final class MainActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();
         // Opening the engine UI must immediately reveal system UI and restore normal input.
-        GraphicsCaptureService.setGameForeground(false);
+        GraphicsAccessibilityService.forceHideOverlay();
         if(status!=null&&GraphicsAccessibilityService.isEnabled(this)){
             setStatus(GraphicsAccessibilityService.isConnected()
                 ?"Доверенное наложение подключено. Можно запускать захват Standoff 2."

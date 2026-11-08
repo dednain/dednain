@@ -56,3 +56,7 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 - The engine ignores its own accessibility overlay events to avoid self-hiding.
 - Opening the engine activity hides the layer immediately.
 - Overlay remains non-touchable and non-focusable.
+
+
+### 0.3.5-alpha
+- Reset the target-game foreground state as well as the overlay window alpha whenever the engine activity resumes.

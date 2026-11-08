@@ -34,6 +34,10 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
 
     public static boolean isConnected(){return instance!=null;}
     public static boolean isTargetGameForeground(){return targetGameForeground;}
+    public static void forceHideOverlay(){
+        targetGameForeground=false;
+        GraphicsCaptureService.setGameForeground(false);
+    }
     public static Context activeContext(){GraphicsAccessibilityService s=instance;return s;}
 
     public static boolean showOverlay(View view){

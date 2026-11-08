@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.4-alpha`
+Current version: `0.3.5-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -49,3 +49,7 @@ Current version: `0.3.4-alpha`
 - Non-target app/system window events hide the layer; target game events show it.
 - Own overlay events are ignored; opening the engine UI hides the layer.
 - Requires real-device validation for touch pass-through and PiP/system UI behavior.
+
+
+## 0.3.5-alpha
+- Reset the target-game foreground state when the engine activity resumes, preventing a stale foreground flag from showing the overlay over the engine UI on a subsequent capture start.
