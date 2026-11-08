@@ -3,6 +3,7 @@ package com.gtrealgraphics.engine;
 import android.content.Context;
 import android.graphics.PixelFormat;
 import android.opengl.GLSurfaceView;
+import android.view.Surface;
 
 public final class GraphicsOverlay extends GLSurfaceView {
     private final GpuPostProcessor processor;
@@ -14,18 +15,18 @@ public final class GraphicsOverlay extends GLSurfaceView {
         setEGLConfigChooser(8, 8, 8, 8, 0, 0);
         setZOrderOnTop(true);
         processor = new GpuPostProcessor(context);
+        processor.setRenderRequest(this::requestRender);
         setRenderer(processor);
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
         setPreserveEGLContextOnPause(true);
     }
 
-    public byte[] obtainFrameBuffer(int byteCount) {
-        return processor.obtainFrameBuffer(byteCount);
+    public void setInputSurfaceReadyListener(GpuPostProcessor.SurfaceReadyListener listener) {
+        processor.setSurfaceReadyListener(listener);
     }
 
-    public void submitFrame(byte[] rgba, int width, int height) {
-        processor.submitFrame(rgba, width, height);
-        requestRender();
+    public void setCaptureSize(int width, int height) {
+        processor.setCaptureSize(width, height);
     }
 
     public void setSettings(GpuPostProcessor.Settings settings) {
@@ -34,7 +35,11 @@ public final class GraphicsOverlay extends GLSurfaceView {
     }
 
     public void releaseRenderer() {
-        try { onPause(); } catch (Exception ignored) {}
-        processor.release();
+        try {
+            queueEvent(processor::releaseGlResources);
+            onPause();
+        } catch (Exception ignored) {
+            // The EGL context may already have been destroyed by Android.
+        }
     }
 }
