@@ -4,7 +4,7 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 
 ## Current implementation
 - Android 14 MediaProjection app-window selection flow. Choose Standoff 2 as a single app window.
-- Opaque trusted `TYPE_ACCESSIBILITY_OVERLAY` window with `FLAG_NOT_TOUCHABLE`, so Android 12+ passes game touches through without forcing 80% transparency. The accessibility service does not retrieve window content or perform gestures; the user must explicitly enable it in Android Accessibility settings.
+- Opaque trusted `TYPE_ACCESSIBILITY_OVERLAY` window with `FLAG_NOT_TOUCHABLE` and `FLAG_NOT_TOUCH_MODAL`, so Android 12+ allows game touches to pass through. The accessibility service reads only the foreground package name to show the overlay for Standoff 2 and hide it in other apps; it does not retrieve window content or perform gestures. The user must explicitly enable it in Android Accessibility settings.
 - GPU-native capture: MediaProjection VirtualDisplay writes directly to a Surface backed by SurfaceTexture / OpenGL ES external texture. The current path avoids ImageReader-to-Java-RGBA copies and per-frame CPU texture uploads.
 - GLES 3.0 multi-pass renderer:
   1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature and shadow lift.
@@ -16,6 +16,8 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 - Natural, Cinematic and Competitive starting profiles.
 - Foreground notification with GPU renderer name, RGBA16F availability, separate incoming capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
 - App-window resize handling and settings persistence.
+- Full landscape cutout coverage with `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS`.
+- Visibility callback no longer hides the output layer when the layer itself occludes the captured app; foreground package events control visibility.
 - No INTERNET permission, game APK modification, game asset replacement, process injection or anti-cheat bypass.
 
 ## Important limitations
