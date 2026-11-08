@@ -64,7 +64,8 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private final FloatBuffer quadBuffer;
     private int sceneProgram,brightProgram,blurProgram,finalProgram;
     private int sceneTexture,sceneFbo,bloomTextureA,bloomFboA,bloomTextureB,bloomFboB;
-    private int inputWidth,inputHeight,captureWidth,captureHeight,bloomWidth,bloomHeight,viewWidth,viewHeight;\n    private float targetScale=1.0f;
+    private int inputWidth,inputHeight,captureWidth,captureHeight,bloomWidth,bloomHeight,viewWidth,viewHeight;
+    private float targetScale=1.0f;
     private boolean targetsReady;
 
     public GpuPostProcessor(android.content.Context context){ByteBuffer b=ByteBuffer.allocateDirect(QUAD.length*4).order(ByteOrder.nativeOrder());quadBuffer=b.asFloatBuffer();quadBuffer.put(QUAD).position(0);}
