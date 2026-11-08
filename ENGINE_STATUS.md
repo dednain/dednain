@@ -3,6 +3,7 @@
 Development branch: `gt-real-graphics-engine`
 
 ## Implemented
+- CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
 - Android 14 MediaProjection single-app capture consent.
 - Direct VirtualDisplay -> SurfaceTexture -> GLES external texture input (GPU-native frame path).
 - Five-pass GLES renderer: linear-light scene grade, bright extraction, horizontal Gaussian blur, vertical Gaussian blur, final composite.
