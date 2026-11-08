@@ -8,9 +8,9 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 - GLES 3.0 multi-pass renderer:
   1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature and shadow lift.
   2. RGBA16F intermediate render targets when half-float color-buffer support exists (RGBA8 fallback), preserving post-process highlight headroom; final ACES-style tone mapping and sRGB output.
-  2. Quarter-resolution bright-pass extraction with adjustable threshold.
-  3. Horizontal and vertical Gaussian bloom blur.
-  4. Final composite with bloom, edge sharpening, vignette and sRGB output transfer.
+  3. Quarter-resolution bright-pass extraction with adjustable threshold.
+  4. Horizontal and vertical Gaussian bloom blur.
+  5. Final composite with bloom, edge sharpening, vignette and sRGB output transfer.
 - Adjustable 50–100% GPU render resolution for performance/quality tuning.
 - Natural, Cinematic and Competitive starting profiles.
 - Foreground notification with separate incoming capture FPS and rendered-frame submission FPS telemetry, plus Stop action.
