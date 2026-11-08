@@ -86,6 +86,9 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
 
     @Override public void onSurfaceCreated(GL10 gl,EGLConfig config){
         released=false;
+        framePending.set(false);
+        if(inputTexture!=null){try{inputTexture.setOnFrameAvailableListener(null);inputTexture.release();}catch(Exception ignored){}inputTexture=null;}
+        if(inputSurface!=null){try{inputSurface.release();}catch(Exception ignored){}inputSurface=null;}
         try{
             String extensions=GLES30.glGetString(GLES30.GL_EXTENSIONS);
             if(extensions==null||!extensions.contains("GL_OES_EGL_image_external_essl3"))
