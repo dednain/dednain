@@ -58,7 +58,7 @@ public final class GraphicsCaptureService extends Service {
         if(s==null)return;
         s.mainHandler.post(()->{
             if(s.overlay!=null&&!s.shuttingDown){
-                s.overlay.setVisibility(foreground?android.view.View.VISIBLE:android.view.View.INVISIBLE);
+                s.overlay.setAlpha(foreground?1.0f:0.0f);
                 Log.i(TAG,"Game foreground="+foreground+"; overlay visibility updated");
             }
         });
@@ -90,7 +90,7 @@ public final class GraphicsCaptureService extends Service {
             Context overlayContext=GraphicsAccessibilityService.activeContext();
             if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
             overlay=new GraphicsOverlay(overlayContext);
-            overlay.setVisibility(GraphicsAccessibilityService.isTargetGameForeground()?android.view.View.VISIBLE:android.view.View.INVISIBLE);
+            overlay.setAlpha(GraphicsAccessibilityService.isTargetGameForeground()?1.0f:0.0f);
             overlay.setCaptureSize(captureWidth,captureHeight);
             overlay.setSettings(loadSettings());
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
