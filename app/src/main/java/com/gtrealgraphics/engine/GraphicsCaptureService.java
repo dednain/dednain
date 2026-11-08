@@ -58,8 +58,9 @@ public final class GraphicsCaptureService extends Service {
         if(s==null)return;
         s.mainHandler.post(()->{
             if(s.overlay!=null&&!s.shuttingDown){
+                s.overlay.setVisibility(android.view.View.VISIBLE);
                 s.overlay.setAlpha(foreground?1.0f:0.0f);
-                Log.i(TAG,"Game foreground="+foreground+"; overlay visibility updated");
+                Log.i(TAG,"Game foreground="+foreground+"; overlay alpha="+(foreground?1.0f:0.0f));
             }
         });
     }
@@ -68,7 +69,7 @@ public final class GraphicsCaptureService extends Service {
 
     @Override public int onStartCommand(Intent intent,int flags,int startId){
         if(intent==null||ACTION_STOP.equals(intent.getAction())){stopSelf();return START_NOT_STICKY;}
-        if(projection!=null)return START_NOT_STICKY;
+        if(projection!=null){Log.w(TAG,"Duplicate start ignored; projection remains active");return START_NOT_STICKY;}
         try{
             startAsForeground();
             int resultCode=intent.getIntExtra(EXTRA_RESULT_CODE,0);
@@ -80,26 +81,7 @@ public final class GraphicsCaptureService extends Service {
             projection=manager.getMediaProjection(resultCode,resultData);
             if(projection==null)throw new IllegalStateException("MediaProjection unavailable");
 
-            windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
-            DisplayMetrics metrics=new DisplayMetrics();
-            windowManager.getDefaultDisplay().getRealMetrics(metrics);
-            densityDpi=metrics.densityDpi;
-            captureWidth=metrics.widthPixels;
-            captureHeight=metrics.heightPixels;
-
-            Context overlayContext=GraphicsAccessibilityService.activeContext();
-            if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
-            overlay=new GraphicsOverlay(overlayContext);
-            overlay.setAlpha(GraphicsAccessibilityService.isTargetGameForeground()?1.0f:0.0f);
-            overlay.setCaptureSize(captureWidth,captureHeight);
-            overlay.setSettings(loadSettings());
-            overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
-            overlay.setFrameAvailableListener(this::recordFrame);
-            overlay.setFrameRenderedListener(this::recordRenderedFrame);
-            overlay.setRendererErrorListener(this::onRendererError);
-            overlay.setRendererInfoListener(this::onRendererInfo);
-            addOverlay();
-
+            // Register before GLSurfaceView asynchronously publishes its Surface.
             projectionCallback=new MediaProjection.Callback(){
                 @Override public void onStop(){stopSelf();}
                 @Override public void onCapturedContentResize(int width,int height){
@@ -114,12 +96,34 @@ public final class GraphicsCaptureService extends Service {
                     Log.i(TAG,"Captured app resized: "+geometry);
                 }
                 @Override public void onCapturedContentVisibilityChanged(boolean visible){
-                    // Do not hide our own output here: it intentionally covers the captured app,
-                    // so this callback can otherwise create a hide/show feedback loop.
-                    Log.i(TAG,"Captured app visibility callback="+visible+" (foreground app events control overlay visibility)");
+                    // Informational only: our trusted overlay can itself cover the selected app.
+                    Log.i(TAG,"Captured app visibility callback="+visible+"; accessibility package tracking controls overlay visibility");
                 }
             };
             projection.registerCallback(projectionCallback,new android.os.Handler(getMainLooper()));
+
+            windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
+            DisplayMetrics metrics=new DisplayMetrics();
+            windowManager.getDefaultDisplay().getRealMetrics(metrics);
+            densityDpi=metrics.densityDpi;
+            captureWidth=metrics.widthPixels;
+            captureHeight=metrics.heightPixels;
+
+            Context overlayContext=GraphicsAccessibilityService.activeContext();
+            if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
+            overlay=new GraphicsOverlay(overlayContext);
+            overlay.setAlpha(GraphicsAccessibilityService.isTargetGameForeground()?1.0f:0.0f);
+            overlay.setVisibility(android.view.View.VISIBLE);
+            overlay.setCaptureSize(captureWidth,captureHeight);
+            overlay.setSettings(loadSettings());
+            overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
+            overlay.setFrameAvailableListener(this::recordFrame);
+            overlay.setFrameRenderedListener(this::recordRenderedFrame);
+            overlay.setRendererErrorListener(this::onRendererError);
+            overlay.setRendererInfoListener(this::onRendererInfo);
+            addOverlay();
+
+
             fpsWindowStart=System.currentTimeMillis();
             updateNotification("Ожидание GPU SurfaceTexture");
         }catch(Throwable error){
@@ -142,6 +146,7 @@ public final class GraphicsCaptureService extends Service {
         s.sharpness=p.getFloat("sharpness",s.sharpness);
         s.shadowLift=p.getFloat("shadowLift",s.shadowLift);
         s.localContrast=p.getFloat("localContrast",s.localContrast);
+        s.detailBoost=p.getFloat("detailBoost",s.detailBoost);
         s.temperature=p.getFloat("temperature",s.temperature);
         s.vignette=p.getFloat("vignette",s.vignette);
         s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);

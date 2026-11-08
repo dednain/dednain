@@ -41,3 +41,10 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 - Lowered default bloom/sharpening to prevent halos and ghost-like edge artifacts.
 - Added a one-time migration from older saved graphics settings.
 - Avoids aggressive HUD cropping on large capture/output aspect mismatches and reports both dimensions.
+
+
+### 0.3.3-alpha
+- Fixed system-window events incorrectly hiding the overlay.
+- Registered MediaProjection callback before the asynchronous VirtualDisplay creation path.
+- Added edge-aware micro-detail enhancement and halo-limited sharpening.
+- Added a micro-detail setting with a versioned preference migration.

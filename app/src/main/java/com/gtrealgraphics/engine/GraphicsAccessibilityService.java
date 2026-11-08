@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -21,6 +23,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
     private static volatile boolean targetGameForeground;
     private WindowManager windowManager;
     private View attachedOverlay;
+    private String homePackage;
 
     public static boolean isEnabled(Context context) {
         String enabled=Settings.Secure.getString(
@@ -86,28 +89,34 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
         targetGameForeground=false;
-        android.util.Log.i("GT-Accessibility","Trusted non-touchable overlay service connected; accessibility window allows pass-through");
+        try{
+            Intent home=new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+            android.content.pm.ResolveInfo resolved=getPackageManager().resolveActivity(home,PackageManager.MATCH_DEFAULT_ONLY);
+            homePackage=resolved!=null&&resolved.activityInfo!=null?resolved.activityInfo.packageName:null;
+        }catch(Exception ignored){homePackage=null;}
+        android.util.Log.i("GT-Accessibility","Connected; home="+homePackage+"; trusted overlay passes game touches");
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
-        if(event==null||event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
-        CharSequence packageName=event.getPackageName();
-        if(packageName==null)return;
-        String foregroundPackage=packageName.toString();
-        if(foregroundPackage.isEmpty())return;
-        if(getPackageName().equals(foregroundPackage)){
-            CharSequence className=event.getClassName();
-            if(className!=null&&className.toString().endsWith("MainActivity")){
-                targetGameForeground=false;
-                GraphicsCaptureService.setGameForeground(false);
-            }
-            return;
-        }
-        // Read only the foreground package name; never retrieve window text or view content.
-        targetGameForeground=TARGET_GAME_PACKAGE.equals(foregroundPackage);
-        GraphicsCaptureService.setGameForeground(targetGameForeground);
+        if(event==null)return;int type=event.getEventType();
+        if(type!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED&&type!=AccessibilityEvent.TYPE_WINDOWS_CHANGED)return;
+        CharSequence packageName=event.getPackageName();if(packageName==null)return;
+        String foregroundPackage=packageName.toString();if(foregroundPackage.isEmpty())return;
+        if(TARGET_GAME_PACKAGE.equals(foregroundPackage)){updateGameForeground(true,"target game foreground");return;}
+        if(getPackageName().equals(foregroundPackage)){updateGameForeground(false,"engine activity foreground");return;}
+        if(homePackage!=null&&homePackage.equals(foregroundPackage)){updateGameForeground(false,"home launcher foreground");return;}
+        // Ignore transient Android system windows: they are not app switches.
+        try{ApplicationInfo info=getPackageManager().getApplicationInfo(foregroundPackage,0);
+            int systemFlags=ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
+            if((info.flags&systemFlags)!=0){android.util.Log.d("GT-Accessibility","Ignoring system window: "+foregroundPackage);return;}
+            updateGameForeground(false,"another app foreground: "+foregroundPackage);
+        }catch(PackageManager.NameNotFoundException ignored){android.util.Log.d("GT-Accessibility","Ignoring unknown window: "+foregroundPackage);}
     }
-
+    private void updateGameForeground(boolean foreground,String reason){
+        if(targetGameForeground==foreground)return;targetGameForeground=foreground;
+        android.util.Log.i("GT-Accessibility","Game foreground="+foreground+"; reason="+reason);
+        GraphicsCaptureService.setGameForeground(foreground);
+    }
     @Override public void onInterrupt(){}
 
     @Override public boolean onUnbind(Intent intent){

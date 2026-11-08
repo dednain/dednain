@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.2-alpha`
+Current version: `0.3.3-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -34,3 +34,11 @@ Current version: `0.3.2-alpha`
 - Conservative default post-processing and one-time settings migration to remove old high-bloom/high-sharpen settings.
 - Capture/output dimension telemetry and reduced crop when aspect ratios diverge.
 - Pending physical validation on Infinix GT 20 Pro.
+
+
+## 0.3.3-alpha
+- Accessibility foreground tracking ignores transient Android system windows instead of hiding the filter.
+- MediaProjection callback is registered before the GPU surface can create the VirtualDisplay.
+- Added edge-aware image-space detail enhancement and bounded sharpening.
+- Added a persistent micro-detail setting.
+- Requires physical validation on Infinix GT 20 Pro; no claim of adding new game geometry or source textures.

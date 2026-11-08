@@ -27,10 +27,10 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private static final String VERTEX=
         "#version 300 es\nlayout(location=0) in vec2 aPosition;\nlayout(location=1) in vec2 aTexCoord;\nout vec2 vUv;\nvoid main(){gl_Position=vec4(aPosition,0.0,1.0);vUv=aTexCoord;}\n";
     private static final String SCENE=
-        "#version 300 es\n#extension GL_OES_EGL_image_external_essl3 : require\nprecision highp float;\nin vec2 vUv;\nuniform samplerExternalOES uInput;\nuniform mat4 uTexMatrix;\nuniform vec2 uTexel;\nuniform float uExposure,uContrast,uSaturation,uShadowLift,uLocalContrast,uTemperature;\nout vec4 fragColor;\n"+
+        "#version 300 es\n#extension GL_OES_EGL_image_external_essl3 : require\nprecision highp float;\nin vec2 vUv;\nuniform samplerExternalOES uInput;\nuniform mat4 uTexMatrix;\nuniform vec2 uTexel;\nuniform float uExposure,uContrast,uSaturation,uShadowLift,uLocalContrast,uTemperature,uDetailBoost;\nout vec4 fragColor;\n"+
         "vec3 toLinear(vec3 c){return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}\n"+
         "vec3 src(vec2 p){return toLinear(texture(uInput,(uTexMatrix*vec4(p,0.0,1.0)).xy).rgb);}\n"+
-        "void main(){vec3 c=src(vUv);vec3 n=src(vUv+vec2(0.0,uTexel.y));vec3 s=src(vUv-vec2(0.0,uTexel.y));vec3 e=src(vUv+vec2(uTexel.x,0.0));vec3 w=src(vUv-vec2(uTexel.x,0.0));vec3 avg=(n+s+e+w)*0.25;float lum=dot(c,vec3(0.2126,0.7152,0.0722));float sh=1.0-smoothstep(0.02,0.38,lum);c+=sh*uShadowLift;c+=(c-avg)*uLocalContrast;c*=uExposure;c=(c-0.5)*uContrast+0.5;c.r*=1.0+uTemperature*0.10;c.b*=1.0-uTemperature*0.10;float gray=dot(c,vec3(0.2126,0.7152,0.0722));c=mix(vec3(gray),c,uSaturation);fragColor=vec4(max(c,vec3(0.0)),1.0);}\n";
+        "void main(){vec3 c=src(vUv);vec3 n=src(vUv+vec2(0.0,uTexel.y));vec3 s=src(vUv-vec2(0.0,uTexel.y));vec3 e=src(vUv+vec2(uTexel.x,0.0));vec3 w=src(vUv-vec2(uTexel.x,0.0));vec3 ne=src(vUv+uTexel);vec3 nw=src(vUv+vec2(-uTexel.x,uTexel.y));vec3 se=src(vUv+vec2(uTexel.x,-uTexel.y));vec3 sw=src(vUv-uTexel);vec3 avg=(n+s+e+w+ne+nw+se+sw)*0.125;float lum=dot(c,vec3(0.2126,0.7152,0.0722));float avgLum=dot(avg,vec3(0.2126,0.7152,0.0722));float edge=smoothstep(0.012,0.11,abs(lum-avgLum));vec3 detail=clamp(c-avg,vec3(-0.075),vec3(0.075));c+=detail*(uDetailBoost*edge);float sh=1.0-smoothstep(0.02,0.38,lum);c+=sh*uShadowLift;c+=(c-avg)*uLocalContrast;c*=uExposure;c=(c-0.5)*uContrast+0.5;c.r*=1.0+uTemperature*0.10;c.b*=1.0-uTemperature*0.10;float gray=dot(c,vec3(0.2126,0.7152,0.0722));c=mix(vec3(gray),c,uSaturation);fragColor=vec4(max(c,vec3(0.0)),1.0);}\n";
     private static final String BRIGHT=
         "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene;uniform vec2 uTexel;uniform float uThreshold;\n"+
         "void main(){vec3 c=(texture(uScene,vUv+uTexel*vec2(-1.5,-1.5)).rgb+texture(uScene,vUv+uTexel*vec2(1.5,-1.5)).rgb+texture(uScene,vUv+uTexel*vec2(-1.5,1.5)).rgb+texture(uScene,vUv+uTexel*vec2(1.5,1.5)).rgb)*0.25;float l=max(max(c.r,c.g),c.b);float k=max(uThreshold*0.5,0.001);float soft=clamp((l-uThreshold+k)/(2.0*k),0.0,1.0);soft=soft*soft*k;float contribution=max(l-uThreshold,0.0)+soft;fragColor=vec4(c*(contribution/max(l,0.0001)),1.0);}\n";
@@ -41,15 +41,14 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene,uBloom;uniform vec2 uTexel,uUvScale;uniform float uBloomStrength,uSharpness,uVignette,uHdrLook;\n"+
         "vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);}\n"+
         "vec3 toSrgb(vec3 c){return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}\n"+
-        "void main(){vec2 uv=(vUv-vec2(0.5))*uUvScale+vec2(0.5);vec3 c=texture(uScene,uv).rgb;vec3 n=texture(uScene,uv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,uv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,uv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,uv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,uv).rgb*uBloomStrength;c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
-
+        "void main(){vec2 uv=(vUv-vec2(0.5))*uUvScale+vec2(0.5);vec3 c=texture(uScene,uv).rgb;vec3 n=texture(uScene,uv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,uv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,uv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,uv-vec2(uTexel.x,0.0)).rgb;vec3 avg=(n+s+e+w)*0.25;vec3 edgeDetail=clamp(c-avg,vec3(-0.06),vec3(0.06));float edge=smoothstep(0.008,0.12,length(edgeDetail));c+=edgeDetail*(uSharpness*edge);c+=texture(uBloom,uv).rgb*uBloomStrength;c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
     private static final float[] QUAD={-1,-1,0,0, 1,-1,1,0, -1,1,0,1, 1,1,1,1};
     public static final class Settings {
-        public float saturation=1.08f,contrast=1.04f,exposure=1.02f,bloom=0.0f,sharpness=0.0f,hdrLook=0.20f,shadowLift=0.03f,localContrast=0.04f,temperature=0f,vignette=0.0f,bloomThreshold=0.82f,renderScale=1.0f;
+        public float saturation=1.10f,contrast=1.06f,exposure=1.02f,bloom=0.02f,sharpness=0.12f,hdrLook=0.18f,shadowLift=0.035f,localContrast=0.09f,detailBoost=0.28f,temperature=0f,vignette=0.02f,bloomThreshold=0.86f,renderScale=1.0f;
         public static Settings defaults(){return new Settings();}
-        public Settings copy(){Settings s=new Settings();s.saturation=saturation;s.contrast=contrast;s.exposure=exposure;s.bloom=bloom;s.sharpness=sharpness;s.hdrLook=hdrLook;s.shadowLift=shadowLift;s.localContrast=localContrast;s.temperature=temperature;s.vignette=vignette;s.bloomThreshold=bloomThreshold;s.renderScale=renderScale;return s;}
-        public static Settings cinematic(){Settings s=new Settings();s.saturation=1.14f;s.contrast=1.08f;s.exposure=1.03f;s.bloom=0.06f;s.sharpness=0.04f;s.hdrLook=0.30f;s.shadowLift=0.035f;s.localContrast=0.07f;s.temperature=0.04f;s.vignette=0.04f;s.bloomThreshold=0.82f;s.renderScale=1.0f;return s;}
-        public static Settings competitive(){Settings s=new Settings();s.saturation=1.06f;s.contrast=1.10f;s.exposure=1.02f;s.bloom=0.0f;s.sharpness=0.08f;s.hdrLook=0.12f;s.shadowLift=0.05f;s.localContrast=0.08f;s.vignette=0f;s.bloomThreshold=0.90f;s.renderScale=0.85f;return s;}
+        public Settings copy(){Settings s=new Settings();s.saturation=saturation;s.contrast=contrast;s.exposure=exposure;s.bloom=bloom;s.sharpness=sharpness;s.hdrLook=hdrLook;s.shadowLift=shadowLift;s.localContrast=localContrast;s.detailBoost=detailBoost;s.temperature=temperature;s.vignette=vignette;s.bloomThreshold=bloomThreshold;s.renderScale=renderScale;return s;}
+        public static Settings cinematic(){Settings s=new Settings();s.saturation=1.14f;s.contrast=1.08f;s.exposure=1.03f;s.bloom=0.06f;s.sharpness=0.04f;s.hdrLook=0.30f;s.shadowLift=0.035f;s.localContrast=0.10f;s.detailBoost=0.20f;s.temperature=0.04f;s.vignette=0.04f;s.bloomThreshold=0.82f;s.renderScale=1.0f;return s;}
+        public static Settings competitive(){Settings s=new Settings();s.saturation=1.06f;s.contrast=1.10f;s.exposure=1.02f;s.bloom=0.0f;s.sharpness=0.08f;s.hdrLook=0.12f;s.shadowLift=0.05f;s.localContrast=0.12f;s.detailBoost=0.34f;s.vignette=0f;s.bloomThreshold=0.90f;s.renderScale=0.85f;return s;}
     }
 
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
@@ -69,7 +68,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private final float[] textureMatrix=new float[16];
     private final FloatBuffer quadBuffer;
     private int sceneProgram,brightProgram,blurProgram,finalProgram;
-    private int sceneInputLoc,sceneMatrixLoc,sceneTexelLoc,sceneExposureLoc,sceneContrastLoc,sceneSaturationLoc,sceneShadowLoc,sceneLocalContrastLoc,sceneTemperatureLoc;
+    private int sceneInputLoc,sceneMatrixLoc,sceneTexelLoc,sceneExposureLoc,sceneContrastLoc,sceneSaturationLoc,sceneShadowLoc,sceneLocalContrastLoc,sceneTemperatureLoc,sceneDetailLoc;
     private int brightSceneLoc,brightTexelLoc,brightThresholdLoc,blurTextureLoc,blurDirectionLoc;
     private int finalSceneLoc,finalBloomLoc,finalTexelLoc,finalBloomStrengthLoc,finalSharpnessLoc,finalVignetteLoc,finalHdrLoc,finalUvScaleLoc;
     private int sceneTexture,sceneFbo,bloomTextureA,bloomFboA,bloomTextureB,bloomFboB;
@@ -104,7 +103,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
             sceneProgram=program(VERTEX,SCENE);brightProgram=program(VERTEX,BRIGHT);blurProgram=program(VERTEX,BLUR);finalProgram=program(VERTEX,FINAL);
             sceneInputLoc=loc(sceneProgram,"uInput");sceneMatrixLoc=loc(sceneProgram,"uTexMatrix");sceneTexelLoc=loc(sceneProgram,"uTexel");
             sceneExposureLoc=loc(sceneProgram,"uExposure");sceneContrastLoc=loc(sceneProgram,"uContrast");sceneSaturationLoc=loc(sceneProgram,"uSaturation");
-            sceneShadowLoc=loc(sceneProgram,"uShadowLift");sceneLocalContrastLoc=loc(sceneProgram,"uLocalContrast");sceneTemperatureLoc=loc(sceneProgram,"uTemperature");
+            sceneShadowLoc=loc(sceneProgram,"uShadowLift");sceneLocalContrastLoc=loc(sceneProgram,"uLocalContrast");sceneTemperatureLoc=loc(sceneProgram,"uTemperature");sceneDetailLoc=loc(sceneProgram,"uDetailBoost");
             brightSceneLoc=loc(brightProgram,"uScene");brightTexelLoc=loc(brightProgram,"uTexel");brightThresholdLoc=loc(brightProgram,"uThreshold");
             blurTextureLoc=loc(blurProgram,"uTexture");blurDirectionLoc=loc(blurProgram,"uDirection");
             finalSceneLoc=loc(finalProgram,"uScene");finalBloomLoc=loc(finalProgram,"uBloom");finalTexelLoc=loc(finalProgram,"uTexel");
@@ -200,7 +199,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
         GLES30.glUseProgram(sceneProgram);bindExternal();GLES30.glUniformMatrix4fv(sceneMatrixLoc,1,false,textureMatrix,0);
         u2(sceneTexelLoc,1f/captureWidth,1f/captureHeight);u1(sceneExposureLoc,s.exposure);u1(sceneContrastLoc,s.contrast);
-        u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);draw();
+        u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);u1(sceneDetailLoc,s.detailBoost);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
         GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightSceneLoc);u2(brightTexelLoc,1f/inputWidth,1f/inputHeight);u1(brightThresholdLoc,s.bloomThreshold);draw();
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
