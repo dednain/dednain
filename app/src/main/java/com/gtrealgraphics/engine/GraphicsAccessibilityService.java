@@ -44,6 +44,9 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
 
     private boolean attach(View view){
         if(view==null||windowManager==null)return false;
+        view.setClickable(false);
+        view.setFocusable(false);
+        view.setFocusableInTouchMode(false);
         if(attachedOverlay==view)return true;
         if(attachedOverlay!=null)detach(attachedOverlay);
         WindowManager.LayoutParams p=new WindowManager.LayoutParams(
@@ -52,12 +55,13 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE|
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.OPAQUE);
         p.gravity=Gravity.TOP|Gravity.START;
         p.alpha=1.0f;
         p.setTitle("GT Real Graphics Engine");
-        p.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        p.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         try{
             windowManager.addView(view,p);
             attachedOverlay=view;
@@ -78,7 +82,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         super.onServiceConnected();
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
-        android.util.Log.i("GT-Accessibility","Trusted touch-through overlay service connected");
+        android.util.Log.i("GT-Accessibility","Trusted non-touchable overlay service connected; accessibility window allows pass-through");
     }
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
