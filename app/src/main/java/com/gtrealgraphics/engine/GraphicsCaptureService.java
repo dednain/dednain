@@ -90,6 +90,7 @@ public final class GraphicsCaptureService extends Service {
             Context overlayContext=GraphicsAccessibilityService.activeContext();
             if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
             overlay=new GraphicsOverlay(overlayContext);
+            overlay.setVisibility(GraphicsAccessibilityService.isTargetGameForeground()?android.view.View.VISIBLE:android.view.View.INVISIBLE);
             overlay.setCaptureSize(captureWidth,captureHeight);
             overlay.setSettings(loadSettings());
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
