@@ -83,7 +83,7 @@ public final class MainActivity extends Activity {
         slider("Подъём деталей в тенях",0,20,Math.round(settings.shadowLift*100),v->settings.shadowLift=v/100f);
 
         heading("ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ");
-        TextView note=text("Захват передаётся прямо в SurfaceTexture и обрабатывается на GPU. Bloom построен как отдельный quarter-resolution pass с Gaussian blur по двум осям. FPS в уведомлении показывает частоту поступления кадров захвата, а не гарантированную частоту дисплея.",12,0xffaabbd0);root.addView(note);
+        TextView note=text("Захват передаётся прямо в SurfaceTexture и обрабатывается на GPU. Bloom построен как отдельный quarter-resolution pass с Gaussian blur по двум осям. В уведомлении отдельно показаны входной FPS захвата и частота отправки обработанных кадров на экран; это не измерение завершения GPU-команд и не гарантия частоты дисплея.",12,0xffaabbd0);root.addView(note);
         TextView limits=text("Это улучшает уже отрисованную картинку. Настоящие 3D-тени, ray-traced reflections и геометрическую глубину нельзя восстановить из обычного экранного изображения. Shadow lift и локальный контраст — приближённые image-space эффекты, не новые игровые тени.",12,0xffffd08c);limits.setPadding(0,dp(8),0,0);root.addView(limits);
         status=text("Статус: готов к запуску. Разреши отображение поверх приложений и выбери Standoff 2 в системном окне захвата.",12,0xff62e2c5);status.setPadding(0,dp(18),0,0);root.addView(status);
         setContentView(scroll);
