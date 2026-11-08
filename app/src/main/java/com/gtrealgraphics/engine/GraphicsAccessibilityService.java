@@ -74,7 +74,7 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
         attachedOverlay=null;
     }
 
-    @Override protected void onServiceConnected(){
+    @Override public void onServiceConnected(){
         super.onServiceConnected();
         windowManager=(WindowManager)getSystemService(WINDOW_SERVICE);
         instance=this;
