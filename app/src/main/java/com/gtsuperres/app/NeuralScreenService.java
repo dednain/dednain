@@ -132,9 +132,16 @@ public final class NeuralScreenService extends Service {
       try{windows.removeViewImmediate(overlay);}catch(Exception e){Log.w(TAG,"Overlay removal",e);}
       overlay=null;
     }
-    if(thread!=null){thread.quitSafely();thread=null;}
-    // Inference runs only on its own worker thread. It is not interrupted mid-tensor.
-    if(engine!=null){try{engine.close();}catch(Exception ignored){}engine=null;}
+    // Close the interpreter on the inference thread after any active invocation,
+    // otherwise destroy() and native inference could race and crash the process.
+    if(thread!=null&&inferenceHandler!=null){
+      inferenceHandler.post(()->{
+        if(engine!=null){try{engine.close();}catch(Exception ignored){}engine=null;}
+      });
+      thread.quitSafely();
+      thread=null;
+      inferenceHandler=null;
+    }
     super.onDestroy();
   }
   static final class NeuralOverlay extends View {
