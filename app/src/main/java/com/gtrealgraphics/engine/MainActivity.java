@@ -62,7 +62,10 @@ public final class MainActivity extends Activity {
         cinematic.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.cinematic(),"Кинематографический профиль"));
         competitive.setOnClickListener(v->applyPreset(GpuPostProcessor.Settings.competitive(),"Соревновательный профиль"));
 
-        heading("КАЧЕСТВО / ПРОИЗВОДИТЕЛЬНОСТЬ");\n        slider("Разрешение GPU-проходов",50,100,Math.round(settings.renderScale*100),v->settings.renderScale=v/100f);\n\n        heading("ТОНАЛЬНАЯ СТИЛИЗАЦИЯ");
+        heading("КАЧЕСТВО / ПРОИЗВОДИТЕЛЬНОСТЬ");
+        slider("Разрешение GPU-проходов",50,100,Math.round(settings.renderScale*100),v->settings.renderScale=v/100f);
+
+        heading("ТОНАЛЬНАЯ СТИЛИЗАЦИЯ");
         slider("Экспозиция",70,135,Math.round(settings.exposure*100),v->settings.exposure=v/100f);
         slider("Контраст",75,145,Math.round(settings.contrast*100),v->settings.contrast=v/100f);
         slider("Насыщенность",70,150,Math.round(settings.saturation*100),v->settings.saturation=v/100f);
