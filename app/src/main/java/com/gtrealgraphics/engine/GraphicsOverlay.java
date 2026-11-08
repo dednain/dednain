@@ -14,6 +14,7 @@ public final class GraphicsOverlay extends GLSurfaceView {
         setEGLContextClientVersion(3);
         setEGLConfigChooser(8, 8, 8, 0, 0, 0);
         setZOrderOnTop(true);
+        setAlpha(1.0f);
         setClickable(false);
         setFocusable(false);
         setFocusableInTouchMode(false);

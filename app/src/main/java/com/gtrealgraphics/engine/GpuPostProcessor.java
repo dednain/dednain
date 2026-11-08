@@ -43,13 +43,13 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         "vec3 toSrgb(vec3 c){return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}\n"+
         "void main(){vec2 uv=(vUv-vec2(0.5))*uUvScale+vec2(0.5);vec3 c=texture(uScene,uv).rgb;vec3 n=texture(uScene,uv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,uv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,uv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,uv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,uv).rgb*uBloomStrength;c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
 
-    private static final float[] QUAD={-1,-1,0,1, 1,-1,1,1, -1,1,0,0, 1,1,1,0};
+    private static final float[] QUAD={-1,-1,0,0, 1,-1,1,0, -1,1,0,1, 1,1,1,1};
     public static final class Settings {
-        public float saturation=1.12f,contrast=1.08f,exposure=1.03f,bloom=0.28f,sharpness=0.18f,hdrLook=0.32f,shadowLift=0.05f,localContrast=0.12f,temperature=0f,vignette=0.10f,bloomThreshold=0.72f,renderScale=1.0f;
+        public float saturation=1.08f,contrast=1.04f,exposure=1.02f,bloom=0.0f,sharpness=0.0f,hdrLook=0.20f,shadowLift=0.03f,localContrast=0.04f,temperature=0f,vignette=0.0f,bloomThreshold=0.82f,renderScale=1.0f;
         public static Settings defaults(){return new Settings();}
         public Settings copy(){Settings s=new Settings();s.saturation=saturation;s.contrast=contrast;s.exposure=exposure;s.bloom=bloom;s.sharpness=sharpness;s.hdrLook=hdrLook;s.shadowLift=shadowLift;s.localContrast=localContrast;s.temperature=temperature;s.vignette=vignette;s.bloomThreshold=bloomThreshold;s.renderScale=renderScale;return s;}
-        public static Settings cinematic(){Settings s=new Settings();s.saturation=1.18f;s.contrast=1.12f;s.exposure=1.05f;s.bloom=0.38f;s.sharpness=0.12f;s.hdrLook=0.48f;s.shadowLift=0.045f;s.localContrast=0.16f;s.temperature=0.08f;s.vignette=0.16f;s.bloomThreshold=0.68f;s.renderScale=1.0f;return s;}
-        public static Settings competitive(){Settings s=new Settings();s.saturation=1.10f;s.contrast=1.16f;s.exposure=1.06f;s.bloom=0.08f;s.sharpness=0.32f;s.hdrLook=0.12f;s.shadowLift=0.09f;s.localContrast=0.22f;s.vignette=0f;s.bloomThreshold=0.85f;s.renderScale=0.85f;return s;}
+        public static Settings cinematic(){Settings s=new Settings();s.saturation=1.14f;s.contrast=1.08f;s.exposure=1.03f;s.bloom=0.06f;s.sharpness=0.04f;s.hdrLook=0.30f;s.shadowLift=0.035f;s.localContrast=0.07f;s.temperature=0.04f;s.vignette=0.04f;s.bloomThreshold=0.82f;s.renderScale=1.0f;return s;}
+        public static Settings competitive(){Settings s=new Settings();s.saturation=1.06f;s.contrast=1.10f;s.exposure=1.02f;s.bloom=0.0f;s.sharpness=0.08f;s.hdrLook=0.12f;s.shadowLift=0.05f;s.localContrast=0.08f;s.vignette=0f;s.bloomThreshold=0.90f;s.renderScale=0.85f;return s;}
     }
 
     private final Handler mainHandler=new Handler(Looper.getMainLooper());
@@ -185,28 +185,37 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
 
     @Override public void onDrawFrame(GL10 gl){
         if(released||inputTexture==null||sceneProgram==0||viewWidth<=0||viewHeight<=0)return;
-        if(framePending.getAndSet(false)){try{inputTexture.updateTexImage();inputTexture.getTransformMatrix(textureMatrix);}catch(Exception e){Log.w(TAG,"updateTexImage",e);}}
+        if(framePending.getAndSet(false)){
+            try{inputTexture.updateTexImage();inputTexture.getTransformMatrix(textureMatrix);}
+            catch(Exception e){Log.w(TAG,"updateTexImage failed; dropping this frame",e);return;}
+        }
         if(captureWidth!=requestedWidth||captureHeight!=requestedHeight||Math.abs(targetScale-settings.renderScale)>0.001f){
             try{ensureTargets(requestedWidth,requestedHeight);}catch(Throwable error){reportRendererError(error);return;}
         }
         if(!targetsReady)return;
         Settings s=settings;
-        GLES30.glDisable(GLES30.GL_BLEND);
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glUseProgram(sceneProgram);bindExternal();
-        GLES30.glUniformMatrix4fv(sceneMatrixLoc,1,false,textureMatrix,0);u2(sceneTexelLoc,1f/captureWidth,1f/captureHeight);u1(sceneExposureLoc,s.exposure);u1(sceneContrastLoc,s.contrast);u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightSceneLoc);u2(brightTexelLoc,1f/inputWidth,1f/inputHeight);u1(brightThresholdLoc,s.bloomThreshold);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurTextureLoc);u2(blurDirectionLoc,1f/bloomWidth,0);draw();
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurTextureLoc);u2(blurDirectionLoc,0,1f/bloomHeight);draw();
-        float sourceAspect=(float)inputWidth/(float)inputHeight;
-        float outputAspect=(float)viewWidth/(float)viewHeight;
-        float uvScaleX=1f,uvScaleY=1f;
-        if(sourceAspect>outputAspect)uvScaleX=outputAspect/sourceAspect;
-        else uvScaleY=sourceAspect/outputAspect;
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glUseProgram(finalProgram);
-        bind2D(0,sceneTexture,finalSceneLoc);bind2D(1,bloomTextureA,finalBloomLoc);
+        // Opaque full-frame output: no blending, stale scissor state, or retained pixels.
+        GLES30.glDisable(GLES30.GL_BLEND);GLES30.glDisable(GLES30.GL_SCISSOR_TEST);GLES30.glDisable(GLES30.GL_DEPTH_TEST);
+        GLES30.glColorMask(true,true,true,true);GLES30.glClearColor(0f,0f,0f,1f);
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+        GLES30.glUseProgram(sceneProgram);bindExternal();GLES30.glUniformMatrix4fv(sceneMatrixLoc,1,false,textureMatrix,0);
+        u2(sceneTexelLoc,1f/captureWidth,1f/captureHeight);u1(sceneExposureLoc,s.exposure);u1(sceneContrastLoc,s.contrast);
+        u1(sceneSaturationLoc,s.saturation);u1(sceneShadowLoc,s.shadowLift);u1(sceneLocalContrastLoc,s.localContrast);u1(sceneTemperatureLoc,s.temperature);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+        GLES30.glUseProgram(brightProgram);bind2D(0,sceneTexture,brightSceneLoc);u2(brightTexelLoc,1f/inputWidth,1f/inputHeight);u1(brightThresholdLoc,s.bloomThreshold);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboB);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+        GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureA,blurTextureLoc);u2(blurDirectionLoc,1f/bloomWidth,0f);draw();
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,bloomFboA);GLES30.glViewport(0,0,bloomWidth,bloomHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+        GLES30.glUseProgram(blurProgram);bind2D(0,bloomTextureB,blurTextureLoc);u2(blurDirectionLoc,0f,1f/bloomHeight);draw();
+        float sourceAspect=(float)inputWidth/(float)inputHeight,outputAspect=(float)viewWidth/(float)viewHeight;
+        float uvScaleX=1f,uvScaleY=1f;float aspectMismatch=Math.max(sourceAspect/outputAspect,outputAspect/sourceAspect);
+        // Crop only for small differences; preserve all HUD content when ratios diverge.
+        if(aspectMismatch<=1.12f){if(sourceAspect>outputAspect)uvScaleX=outputAspect/sourceAspect;else uvScaleY=sourceAspect/outputAspect;}
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,0);GLES30.glViewport(0,0,viewWidth,viewHeight);GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT);
+        GLES30.glUseProgram(finalProgram);bind2D(0,sceneTexture,finalSceneLoc);bind2D(1,bloomTextureA,finalBloomLoc);
         u2(finalTexelLoc,1f/inputWidth,1f/inputHeight);u2(finalUvScaleLoc,uvScaleX,uvScaleY);
-        u1(finalBloomStrengthLoc,s.bloom);u1(finalSharpnessLoc,s.sharpness);u1(finalVignetteLoc,s.vignette);u1(finalHdrLoc,s.hdrLook);
-        draw();FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
+        u1(finalBloomStrengthLoc,s.bloom);u1(finalSharpnessLoc,s.sharpness);u1(finalVignetteLoc,s.vignette);u1(finalHdrLoc,s.hdrLook);draw();
+        FrameRenderedListener rendered=frameRenderedListener;if(rendered!=null)rendered.onFrameRendered();
     }
     private void reportRendererError(Throwable error){
         Log.e(TAG,"GPU render target update failed",error);

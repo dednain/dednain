@@ -45,7 +45,7 @@ public final class MainActivity extends Activity {
     private void buildUi(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(19),dp(22),dp(19),dp(32));root.setBackgroundColor(0xff07101e);scroll.addView(root);
-        TextView title=text("GT REAL GRAPHICS ENGINE",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
+        TextView title=text("GT REAL GRAPHICS ENGINE 0.3.2",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
         TextView tag=text("REAL-TIME GPU PIPELINE  •  GLES 3.0  •  ANDROID 14+",10,0xff58e1c4);root.addView(tag);
         TextView intro=text("GPU-native захват выбранного окна и полноэкранная обработка. Доверенное системное наложение не принимает касания: Android направляет их в Standoff 2. Сервис проверяет только имя активного пакета, чтобы скрывать графический слой вне игры; содержимое окон не читается, жесты не выполняются.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
 
@@ -100,6 +100,16 @@ public final class MainActivity extends Activity {
     private GpuPostProcessor.Settings loadSettings(){
         android.content.SharedPreferences p=getSharedPreferences("gt_graphics",MODE_PRIVATE);
         GpuPostProcessor.Settings s=GpuPostProcessor.Settings.defaults();
+        if(p.getInt("settings_version",0)<2){
+            p.edit().putInt("settings_version",2)
+                .putFloat("saturation",s.saturation).putFloat("contrast",s.contrast)
+                .putFloat("exposure",s.exposure).putFloat("hdrLook",s.hdrLook)
+                .putFloat("bloom",s.bloom).putFloat("sharpness",s.sharpness)
+                .putFloat("shadowLift",s.shadowLift).putFloat("localContrast",s.localContrast)
+                .putFloat("temperature",s.temperature).putFloat("vignette",s.vignette)
+                .putFloat("bloomThreshold",s.bloomThreshold).putFloat("renderScale",s.renderScale).apply();
+            return s;
+        }
         s.saturation=p.getFloat("saturation",s.saturation);s.contrast=p.getFloat("contrast",s.contrast);s.exposure=p.getFloat("exposure",s.exposure);
         s.hdrLook=p.getFloat("hdrLook",s.hdrLook);s.bloom=p.getFloat("bloom",s.bloom);s.sharpness=p.getFloat("sharpness",s.sharpness);
         s.shadowLift=p.getFloat("shadowLift",s.shadowLift);s.localContrast=p.getFloat("localContrast",s.localContrast);s.temperature=p.getFloat("temperature",s.temperature);
@@ -108,6 +118,7 @@ public final class MainActivity extends Activity {
     private void applyPreset(GpuPostProcessor.Settings s,String label){settings=s;persistAndApply();buildUi();setStatus(label+" применён.");}
     private void persistAndApply(){
         getSharedPreferences("gt_graphics",MODE_PRIVATE).edit()
+            .putInt("settings_version",2)
             .putFloat("saturation",settings.saturation).putFloat("contrast",settings.contrast).putFloat("exposure",settings.exposure)
             .putFloat("hdrLook",settings.hdrLook).putFloat("bloom",settings.bloom).putFloat("sharpness",settings.sharpness)
             .putFloat("shadowLift",settings.shadowLift).putFloat("localContrast",settings.localContrast).putFloat("temperature",settings.temperature)

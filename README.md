@@ -34,3 +34,10 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 - Android 14+ (API 34)
 - OpenGL ES 3.0 and external-image ESSL3 extension
 - Intended device: Infinix GT 20 Pro
+
+
+### 0.3.2-alpha
+- Corrected SurfaceTexture UV handling and added opaque full-frame render clears.
+- Lowered default bloom/sharpening to prevent halos and ghost-like edge artifacts.
+- Added a one-time migration from older saved graphics settings.
+- Avoids aggressive HUD cropping on large capture/output aspect mismatches and reports both dimensions.

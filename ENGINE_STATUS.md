@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.1-alpha`
+Current version: `0.3.2-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -26,3 +26,11 @@ Current version: `0.3.1-alpha`
 3. Verify app-window capture does not recurse into the overlay.
 4. Measure capture input FPS, GPU render time, thermals and frame pacing.
 5. Tune render scale and shader cost from actual device measurements before adding further effects.
+
+
+## 0.3.2-alpha
+- Opaque, non-blended full-frame output with explicit clearing of all GPU render targets.
+- SurfaceTexture coordinates use the Android-provided transform matrix without an extra manual vertical flip.
+- Conservative default post-processing and one-time settings migration to remove old high-bloom/high-sharpen settings.
+- Capture/output dimension telemetry and reduced crop when aspect ratios diverge.
+- Pending physical validation on Infinix GT 20 Pro.

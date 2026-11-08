@@ -107,7 +107,11 @@ public final class GraphicsCaptureService extends Service {
                     captureWidth=width;captureHeight=height;
                     if(overlay!=null)overlay.setCaptureSize(width,height);
                     if(virtualDisplay!=null)virtualDisplay.resize(width,height,densityDpi);
-                    Log.i(TAG,"Captured app resized to "+width+"x"+height);
+                    int outW=overlay!=null?overlay.getWidth():0;
+                    int outH=overlay!=null?overlay.getHeight():0;
+                    String geometry="Capture "+width+"x"+height+" / output "+outW+"x"+outH;
+                    updateNotification(geometry);
+                    Log.i(TAG,"Captured app resized: "+geometry);
                 }
                 @Override public void onCapturedContentVisibilityChanged(boolean visible){
                     // Do not hide our own output here: it intentionally covers the captured app,
@@ -129,6 +133,7 @@ public final class GraphicsCaptureService extends Service {
     private GpuPostProcessor.Settings loadSettings(){
         android.content.SharedPreferences p=getSharedPreferences("gt_graphics",MODE_PRIVATE);
         GpuPostProcessor.Settings s=GpuPostProcessor.Settings.defaults();
+        if(p.getInt("settings_version",0)<2)return s;
         s.saturation=p.getFloat("saturation",s.saturation);
         s.contrast=p.getFloat("contrast",s.contrast);
         s.exposure=p.getFloat("exposure",s.exposure);
