@@ -33,6 +33,10 @@ public final class GraphicsOverlay extends GLSurfaceView {
         processor.setFrameAvailableListener(listener);
     }
 
+    public void setFrameRenderedListener(GpuPostProcessor.FrameRenderedListener listener) {
+        processor.setFrameRenderedListener(listener);
+    }
+
     public void setSettings(GpuPostProcessor.Settings settings) {
         processor.setSettings(settings);
         requestRender();
