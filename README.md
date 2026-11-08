@@ -4,6 +4,7 @@ Standalone Android 14+ screen post-processor targeting the Infinix GT 20 Pro.
 
 ## Current implementation
 - Android 14 MediaProjection app-window selection flow. Choose Standoff 2 as a single app window.
+- Opaque trusted `TYPE_ACCESSIBILITY_OVERLAY` window with `FLAG_NOT_TOUCHABLE`, so Android 12+ passes game touches through without forcing 80% transparency. The accessibility service does not retrieve window content or perform gestures; the user must explicitly enable it in Android Accessibility settings.
 - GPU-native capture: MediaProjection VirtualDisplay writes directly to a Surface backed by SurfaceTexture / OpenGL ES external texture. The current path avoids ImageReader-to-Java-RGBA copies and per-frame CPU texture uploads.
 - GLES 3.0 multi-pass renderer:
   1. Scene grade in linear light with sRGB decode, exposure, contrast, saturation, temperature and shadow lift.
