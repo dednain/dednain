@@ -45,6 +45,10 @@ public final class GraphicsCaptureService extends Service {
         GraphicsCaptureService s=activeInstance;
         if(s!=null&&s.overlay!=null)s.overlay.setSettings(settings);
     }
+    public static void stopActiveCapture(){
+        GraphicsCaptureService s=activeInstance;
+        if(s!=null)s.stopSelf();
+    }
     @Override public IBinder onBind(Intent intent){return null;}
     @Override public void onCreate(){super.onCreate();activeInstance=this;createNotificationChannel();}
 
@@ -69,7 +73,9 @@ public final class GraphicsCaptureService extends Service {
             captureWidth=metrics.widthPixels;
             captureHeight=metrics.heightPixels;
 
-            overlay=new GraphicsOverlay(this);
+            Context overlayContext=GraphicsAccessibilityService.activeContext();
+            if(overlayContext==null)throw new IllegalStateException("Enable GT Real Graphics Engine in Accessibility settings first");
+            overlay=new GraphicsOverlay(overlayContext);
             overlay.setCaptureSize(captureWidth,captureHeight);
             overlay.setSettings(loadSettings());
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
@@ -117,6 +123,7 @@ public final class GraphicsCaptureService extends Service {
         s.temperature=p.getFloat("temperature",s.temperature);
         s.vignette=p.getFloat("vignette",s.vignette);
         s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);
+        s.renderScale=p.getFloat("renderScale",s.renderScale);
         return s;
     }
 
@@ -152,17 +159,9 @@ public final class GraphicsCaptureService extends Service {
     }
 
     private void addOverlay(){
-        WindowManager.LayoutParams p=new WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE|
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN|
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            android.graphics.PixelFormat.TRANSLUCENT);
-        p.gravity=Gravity.TOP|Gravity.START;
-        p.setTitle("GT Real Graphics Engine");
-        windowManager.addView(overlay,p);
+        if(!GraphicsAccessibilityService.showOverlay(overlay))
+            throw new IllegalStateException("Trusted accessibility overlay is not connected");
+        Log.i(TAG,"Opaque trusted overlay attached; game touch events pass through");
     }
 
     private void startAsForeground(){
@@ -220,7 +219,7 @@ public final class GraphicsCaptureService extends Service {
         }
         if(overlay!=null&&windowManager!=null){
             try{overlay.releaseRenderer();}catch(Exception ignored){}
-            try{windowManager.removeViewImmediate(overlay);}catch(Exception ignored){}
+            try{GraphicsAccessibilityService.hideOverlay(overlay);}catch(Exception ignored){}
             overlay=null;
         }
         if(captureSurface!=null){try{captureSurface.release();}catch(Exception ignored){}captureSurface=null;}
