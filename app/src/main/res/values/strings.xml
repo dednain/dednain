@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="graphics_accessibility_label">GT Real Graphics Engine — графическое наложение</string>
+    <string name="graphics_accessibility_description">Только показывает обработанное изображение поверх игры. Не читает содержимое окон, не выполняет жесты и не перехватывает касания.</string>
+</resources>
