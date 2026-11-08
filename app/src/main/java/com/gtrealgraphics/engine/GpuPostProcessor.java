@@ -26,7 +26,8 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     private static final String SCENE=
         "#version 300 es\n#extension GL_OES_EGL_image_external_essl3 : require\nprecision highp float;\nin vec2 vUv;\nuniform samplerExternalOES uInput;\nuniform mat4 uTexMatrix;\nuniform vec2 uTexel;\nuniform float uExposure,uContrast,uSaturation,uShadowLift,uLocalContrast,uTemperature,uHdrLook;\nout vec4 fragColor;\n"+
         "vec3 aces(vec3 x){return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0);}\n"+
-        "vec3 src(vec2 p){return texture(uInput,(uTexMatrix*vec4(p,0.0,1.0)).xy).rgb;}\n"+
+        "vec3 toLinear(vec3 c){return mix(c/12.92,pow((c+0.055)/1.055,vec3(2.4)),step(vec3(0.04045),c));}\n"+
+        "vec3 src(vec2 p){return toLinear(texture(uInput,(uTexMatrix*vec4(p,0.0,1.0)).xy).rgb);}\n"+
         "void main(){vec3 c=src(vUv);vec3 n=src(vUv+vec2(0.0,uTexel.y));vec3 s=src(vUv-vec2(0.0,uTexel.y));vec3 e=src(vUv+vec2(uTexel.x,0.0));vec3 w=src(vUv-vec2(uTexel.x,0.0));vec3 avg=(n+s+e+w)*0.25;float lum=dot(c,vec3(0.2126,0.7152,0.0722));float sh=1.0-smoothstep(0.02,0.38,lum);c+=sh*uShadowLift;c+=(c-avg)*uLocalContrast;c*=uExposure;c=(c-0.5)*uContrast+0.5;c.r*=1.0+uTemperature*0.10;c.b*=1.0-uTemperature*0.10;float gray=dot(c,vec3(0.2126,0.7152,0.0722));c=mix(vec3(gray),c,uSaturation);c=mix(c,aces(max(c,vec3(0.0))),uHdrLook);fragColor=vec4(clamp(c,0.0,1.0),1.0);}\n";
     private static final String BRIGHT=
         "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene;uniform vec2 uTexel;uniform float uThreshold;\n"+
@@ -36,7 +37,8 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         "void main(){vec3 c=texture(uTexture,vUv).rgb*0.227027;c+=texture(uTexture,vUv+uDirection*1.384615).rgb*0.316216;c+=texture(uTexture,vUv-uDirection*1.384615).rgb*0.316216;c+=texture(uTexture,vUv+uDirection*3.230769).rgb*0.070270;c+=texture(uTexture,vUv-uDirection*3.230769).rgb*0.070270;fragColor=vec4(c,1.0);}\n";
     private static final String FINAL=
         "#version 300 es\nprecision highp float;in vec2 vUv;out vec4 fragColor;uniform sampler2D uScene,uBloom;uniform vec2 uTexel;uniform float uBloomStrength,uSharpness,uVignette;\n"+
-        "void main(){vec3 c=texture(uScene,vUv).rgb;vec3 n=texture(uScene,vUv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,vUv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,vUv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,vUv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,vUv).rgb*uBloomStrength;float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));fragColor=vec4(clamp(c*v,0.0,1.0),1.0);}\n";
+        "vec3 toSrgb(vec3 c){return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));}\n"+
+        "void main(){vec3 c=texture(uScene,vUv).rgb;vec3 n=texture(uScene,vUv+vec2(0.0,uTexel.y)).rgb;vec3 s=texture(uScene,vUv-vec2(0.0,uTexel.y)).rgb;vec3 e=texture(uScene,vUv+vec2(uTexel.x,0.0)).rgb;vec3 w=texture(uScene,vUv-vec2(uTexel.x,0.0)).rgb;c+=(c-(n+s+e+w)*0.25)*uSharpness;c+=texture(uBloom,vUv).rgb*uBloomStrength;float v=1.0-uVignette*smoothstep(0.25,0.78,distance(vUv,vec2(0.5)));c=clamp(c*v,0.0,1.0);fragColor=vec4(clamp(toSrgb(c),0.0,1.0),1.0);}\n";
 
     private static final float[] QUAD={-1,-1,0,1, 1,-1,1,1, -1,1,0,0, 1,1,1,0};
     public static final class Settings {
