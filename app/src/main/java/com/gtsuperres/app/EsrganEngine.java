@@ -24,7 +24,10 @@ public final class EsrganEngine implements Closeable {
     byte[] bytes=out.toByteArray();
     if(bytes.length<10000)throw new IllegalStateException("The trained model is missing");
     Interpreter.Options opts=new Interpreter.Options().setNumThreads(4);
-    interpreter=new Interpreter(ByteBuffer.allocateDirect(bytes.length).order(ByteOrder.nativeOrder()).put(bytes).rewind(), opts);
+    ByteBuffer model=ByteBuffer.allocateDirect(bytes.length).order(ByteOrder.nativeOrder());
+    model.put(bytes);
+    model.rewind();
+    interpreter=new Interpreter(model,opts);
     int[] input=interpreter.getInputTensor(0).shape();
     int[] output=interpreter.getOutputTensor(0).shape();
     if(input.length!=4||input[1]!=IN_H||input[2]!=IN_W||input[3]!=3 ||
