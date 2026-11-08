@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
         root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(19),dp(22),dp(19),dp(32));root.setBackgroundColor(0xff07101e);scroll.addView(root);
         TextView title=text("GT REAL GRAPHICS ENGINE",24,0xfff2f7ff);title.setTypeface(null,1);root.addView(title);
         TextView tag=text("REAL-TIME GPU PIPELINE  •  GLES 3.0  •  ANDROID 14+",10,0xff58e1c4);root.addView(tag);
-        TextView intro=text("GPU-native захват выбранного окна без копирования каждого кадра в Java. Пять проходов обработки: тональная стилизация, выделение света, Gaussian bloom и финальная композиция.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
+        TextView intro=text("GPU-native захват выбранного окна без копирования каждого кадра в Java. Пять проходов обработки: тональная стилизация, выделение света, Gaussian bloom и финальная композиция. RGBA16F промежуточные буферы используются, если видеодрайвер их поддерживает.",13,0xffb7c8dc);intro.setPadding(0,dp(12),0,dp(8));root.addView(intro);
 
         Button start=button("ЗАПУСТИТЬ ОБРАБОТКУ",true);root.addView(start);start.setOnClickListener(v->startCaptureFlow());
         Button stop=button("ОСТАНОВИТЬ",false);root.addView(stop);stop.setOnClickListener(v->{stopService(new Intent(this,GraphicsCaptureService.class));setStatus("Обработка остановлена.");});
