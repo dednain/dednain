@@ -243,7 +243,8 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     }
 
     private void upload(Frame frame) {
-        if (frame.width != textureWidth || frame.height != textureHeight) {
+        boolean sizeChanged = frame.width != textureWidth || frame.height != textureHeight;
+        if (sizeChanged) {
             textureWidth = frame.width;
             textureHeight = frame.height;
             uploadBuffer = ByteBuffer.allocateDirect(frame.rgba.length).order(ByteOrder.nativeOrder());
@@ -253,10 +254,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
         uploadBuffer.position(0);
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, texture);
         GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 1);
-        if (frame.width != textureWidth || frame.height != textureHeight) {
-            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8,
-                frame.width, frame.height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, uploadBuffer);
-        } else if (uploadBuffer.capacity() == frame.rgba.length) {
+        if (sizeChanged) {
             GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8,
                 frame.width, frame.height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, uploadBuffer);
         } else {
