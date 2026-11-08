@@ -37,7 +37,7 @@ public final class GraphicsCaptureService extends Service {
     private Surface captureSurface;
     private int densityDpi,captureWidth,captureHeight;
     private long fpsWindowStart;
-    private int framesInWindow,lastFps;
+    private int inputFramesInWindow,renderedFramesInWindow,inputFps,renderFps;
     private volatile boolean shuttingDown;
 
     public static void updateSettings(GpuPostProcessor.Settings settings){
@@ -73,6 +73,7 @@ public final class GraphicsCaptureService extends Service {
             overlay.setSettings(loadSettings());
             overlay.setInputSurfaceReadyListener(this::onInputSurfaceReady);
             overlay.setFrameAvailableListener(this::recordFrame);
+            overlay.setFrameRenderedListener(this::recordRenderedFrame);
             addOverlay();
 
             projectionCallback=new MediaProjection.Callback(){
@@ -166,10 +167,24 @@ public final class GraphicsCaptureService extends Service {
         NotificationManager m=getSystemService(NotificationManager.class);
         if(m!=null&&Build.VERSION.SDK_INT>=26){NotificationChannel c=new NotificationChannel(CHANNEL_ID,"GT Graphics Engine",NotificationManager.IMPORTANCE_LOW);c.setDescription("Состояние GPU-постобработки");m.createNotificationChannel(c);}
     }
-    private void recordFrame(){
+    private synchronized void recordFrame(){
         if(shuttingDown)return;
-        framesInWindow++;long now=System.currentTimeMillis();long elapsed=now-fpsWindowStart;
-        if(elapsed>=2000){lastFps=Math.round(framesInWindow*1000f/elapsed);framesInWindow=0;fpsWindowStart=now;updateNotification("GPU input: "+lastFps+" FPS • multi-pass post-process");}
+        inputFramesInWindow++;
+        publishFrameStats();
+    }
+    private synchronized void recordRenderedFrame(){
+        if(shuttingDown)return;
+        renderedFramesInWindow++;
+        publishFrameStats();
+    }
+    private void publishFrameStats(){
+        long now=System.currentTimeMillis();long elapsed=now-fpsWindowStart;
+        if(elapsed>=2000){
+            inputFps=Math.round(inputFramesInWindow*1000f/elapsed);
+            renderFps=Math.round(renderedFramesInWindow*1000f/elapsed);
+            inputFramesInWindow=0;renderedFramesInWindow=0;fpsWindowStart=now;
+            updateNotification("Input "+inputFps+" FPS • rendered "+renderFps+" FPS");
+        }
     }
     private void updateNotification(String message){
         NotificationManager m=getSystemService(NotificationManager.class);if(m==null)return;
