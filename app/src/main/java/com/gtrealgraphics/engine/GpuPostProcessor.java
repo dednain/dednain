@@ -70,7 +70,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     public void setSurfaceReadyListener(SurfaceReadyListener l){surfaceReadyListener=l;}
     public void setFrameAvailableListener(FrameAvailableListener l){frameAvailableListener=l;}
     public void setSettings(Settings s){if(s!=null)settings=s.copy();}
-    public void setCaptureSize(int w,int h){if(w<=0||h<=0)return;requestedWidth=w;requestedHeight=h;SurfaceTexture st=inputTexture;if(st!=null){try{st.setDefaultBufferSize(w,h);}catch(Exception ignored){}}}
+    public void setCaptureSize(int w,int h){if(w<=0||h<=0)return;requestedWidth=w;requestedHeight=h;SurfaceTexture st=inputTexture;if(st!=null){try{st.setDefaultBufferSize(w,h);}catch(Exception ignored){}}Runnable r=renderRequest;if(r!=null)r.run();}
     public void releaseGlResources(){released=true;if(inputTexture!=null){try{inputTexture.setOnFrameAvailableListener(null);inputTexture.release();}catch(Exception ignored){}inputTexture=null;}if(inputSurface!=null){try{inputSurface.release();}catch(Exception ignored){}inputSurface=null;}deleteTexture(externalTexture);deleteTarget(sceneTexture,sceneFbo);deleteTarget(bloomTextureA,bloomFboA);deleteTarget(bloomTextureB,bloomFboB);if(sceneProgram!=0)GLES30.glDeleteProgram(sceneProgram);if(brightProgram!=0)GLES30.glDeleteProgram(brightProgram);if(blurProgram!=0)GLES30.glDeleteProgram(blurProgram);if(finalProgram!=0)GLES30.glDeleteProgram(finalProgram);sceneProgram=brightProgram=blurProgram=finalProgram=0;}
     private void deleteTexture(int id){if(id!=0){int[] a={id};GLES30.glDeleteTextures(1,a,0);}}
     private void deleteTarget(int t,int f){deleteTexture(t);if(f!=0){int[] a={f};GLES30.glDeleteFramebuffers(1,a,0);}}
@@ -93,6 +93,7 @@ public final class GpuPostProcessor implements GLSurfaceView.Renderer {
     @Override public void onDrawFrame(GL10 gl){
         if(released||inputTexture==null||sceneProgram==0)return;
         if(framePending.getAndSet(false)){try{inputTexture.updateTexImage();inputTexture.getTransformMatrix(textureMatrix);}catch(Exception e){Log.w(TAG,"updateTexImage",e);}}
+        if(inputWidth!=requestedWidth||inputHeight!=requestedHeight)ensureTargets(requestedWidth,requestedHeight);
         if(!targetsReady)return;Settings s=settings;
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER,sceneFbo);GLES30.glViewport(0,0,inputWidth,inputHeight);GLES30.glUseProgram(sceneProgram);bindExternal();
         GLES30.glUniformMatrix4fv(loc(sceneProgram,"uTexMatrix"),1,false,textureMatrix,0);u2(sceneProgram,"uTexel",1f/inputWidth,1f/inputHeight);u1(sceneProgram,"uExposure",s.exposure);u1(sceneProgram,"uContrast",s.contrast);u1(sceneProgram,"uSaturation",s.saturation);u1(sceneProgram,"uShadowLift",s.shadowLift);u1(sceneProgram,"uLocalContrast",s.localContrast);u1(sceneProgram,"uTemperature",s.temperature);u1(sceneProgram,"uHdrLook",s.hdrLook);draw();
