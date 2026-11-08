@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -117,12 +119,32 @@ public final class GraphicsAccessibilityService extends AccessibilityService {
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(event==null)return;
-        int type=event.getEventType();
-        if(type!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED&&type!=AccessibilityEvent.TYPE_WINDOWS_CHANGED)return;
-        CharSequence name=event.getPackageName();if(name==null)return;
-        String packageName=name.toString();if(packageName.isEmpty())return;
-        if(getPackageName().equals(packageName))return; // Our own overlay must not hide itself.
-        updateGameForeground(TARGET_GAME_PACKAGE.equals(packageName),"window event: "+packageName);
+        // TYPE_WINDOWS_CHANGED fires for transient system/overlay windows and can
+        // incorrectly report System UI after the game is already foreground.
+        // Only a real top-activity change is allowed to switch the game state.
+        if(event.getEventType()!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED)return;
+        CharSequence name=event.getPackageName();
+        if(name==null)return;
+        String packageName=name.toString();
+        if(packageName.isEmpty()||getPackageName().equals(packageName))return;
+        if(TARGET_GAME_PACKAGE.equals(packageName)){
+            updateGameForeground(true,"target game activity changed");
+            return;
+        }
+        // Ignore Android/system apps (status bar, notification shade, permission UI,
+        // keyboard and transient system windows). They do not mean the game was closed.
+        try{
+            ApplicationInfo info=getPackageManager().getApplicationInfo(packageName,0);
+            int systemFlags=ApplicationInfo.FLAG_SYSTEM|ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
+            if((info.flags&systemFlags)!=0){
+                android.util.Log.d("GT-Accessibility","Ignoring transient system activity: "+packageName);
+                return;
+            }
+        }catch(PackageManager.NameNotFoundException ignored){
+            android.util.Log.d("GT-Accessibility","Ignoring unknown window package: "+packageName);
+            return;
+        }
+        updateGameForeground(false,"another app became foreground: "+packageName);
     }
     private void updateGameForeground(boolean foreground,String reason){
         if(targetGameForeground==foreground)return;targetGameForeground=foreground;

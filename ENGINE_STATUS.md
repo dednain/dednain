@@ -2,7 +2,7 @@
 
 Development branch: `gt-real-graphics-engine`
 
-Current version: `0.3.5-alpha`
+Current version: `0.3.6-alpha`
 
 ## Implemented
 - CI build 0.2.0-alpha succeeds; APK zip alignment and v2 signature verification pass.
@@ -53,3 +53,10 @@ Current version: `0.3.5-alpha`
 
 ## 0.3.5-alpha
 - Reset the target-game foreground state when the engine activity resumes, preventing a stale foreground flag from showing the overlay over the engine UI on a subsequent capture start.
+
+
+## 0.3.6-alpha
+- Prevent transient window events from hiding the filter while the target game remains foreground.
+- Ignore Android system packages and unknown package events.
+- Only real activity state changes control the overlay.
+- Requires device validation on Infinix GT 20 Pro.

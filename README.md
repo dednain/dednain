@@ -60,3 +60,11 @@ GitHub Actions workflow "Build GT Real Graphics Engine APK" compiles a debug APK
 
 ### 0.3.5-alpha
 - Reset the target-game foreground state as well as the overlay window alpha whenever the engine activity resumes.
+
+
+### 0.3.6-alpha
+- Ignore `TYPE_WINDOWS_CHANGED`; it fires for transient system/overlay windows and is not a reliable app-switch signal.
+- Use `TYPE_WINDOW_STATE_CHANGED` for foreground activity changes.
+- Ignore Android system packages so notification shade/System UI events cannot switch the game state to false.
+- Unknown package events are ignored; real third-party foreground apps hide the game overlay.
+- Accessibility notification timeout increased to 200 ms.
