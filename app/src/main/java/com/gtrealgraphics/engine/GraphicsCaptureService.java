@@ -38,6 +38,7 @@ public final class GraphicsCaptureService extends Service {
     private int densityDpi,captureWidth,captureHeight;
     private long fpsWindowStart;
     private int inputFramesInWindow,renderedFramesInWindow,inputFps,renderFps;
+    private volatile String rendererInfo="GLES3";
     private volatile boolean shuttingDown;
 
     public static void updateSettings(GpuPostProcessor.Settings settings){
@@ -75,6 +76,7 @@ public final class GraphicsCaptureService extends Service {
             overlay.setFrameAvailableListener(this::recordFrame);
             overlay.setFrameRenderedListener(this::recordRenderedFrame);
             overlay.setRendererErrorListener(this::onRendererError);
+            overlay.setRendererInfoListener(this::onRendererInfo);
             addOverlay();
 
             projectionCallback=new MediaProjection.Callback(){
@@ -116,6 +118,11 @@ public final class GraphicsCaptureService extends Service {
         s.vignette=p.getFloat("vignette",s.vignette);
         s.bloomThreshold=p.getFloat("bloomThreshold",s.bloomThreshold);
         return s;
+    }
+
+    private void onRendererInfo(String info){
+        rendererInfo=info;
+        updateNotification("GPU ready: "+rendererInfo);
     }
 
     private void onRendererError(String message){
@@ -190,7 +197,7 @@ public final class GraphicsCaptureService extends Service {
             inputFps=Math.round(inputFramesInWindow*1000f/elapsed);
             renderFps=Math.round(renderedFramesInWindow*1000f/elapsed);
             inputFramesInWindow=0;renderedFramesInWindow=0;fpsWindowStart=now;
-            updateNotification("Input "+inputFps+" FPS • rendered "+renderFps+" FPS");
+            updateNotification(rendererInfo+" • input "+inputFps+" FPS • render "+renderFps+" FPS");
         }
     }
     private void updateNotification(String message){
