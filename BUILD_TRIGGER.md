@@ -1,1 +1,1 @@
-KONTUR Android APK build trigger. The source bundle is KONTUR_ENGINE_SOURCE.zip; see README-KONTUR.md.
+KONTUR Android APK build trigger. Workflow now uses the runner-provided Android SDK; source bundle: KONTUR_ENGINE_SOURCE.zip.
