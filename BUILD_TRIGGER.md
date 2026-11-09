@@ -1,1 +1,1 @@
-KONTUR Android APK build trigger. SDK setup fixed; source bundle: KONTUR_ENGINE_SOURCE.zip.
+KONTUR Android APK build trigger. Workflow repairs and validates the source archive before compiling.
