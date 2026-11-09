@@ -30,22 +30,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Repair source archive and verify it
+      - name: Assemble source archive and verify it
         run: |
-          python3 - <<'PY'
-          import base64
-          from pathlib import Path
-          archive = Path("KONTUR_ENGINE_SOURCE.zip")
-          data = archive.read_bytes()
-          tail = base64.b64decode("AAAAAAsACwDOAwAAdjsAAAAA")
-          if not data.endswith(tail):
-              raise SystemExit("Unexpected source archive ending")
-          missing = base64.b64decode(Path("parts/chunk3.b64").read_text().strip())
-          archive.write_bytes(data[:-len(tail)] + missing + tail)
-          PY
-          unzip -t KONTUR_ENGINE_SOURCE.zip
+          cat parts/chunk0.b64 parts/chunk3.b64 parts/chunk4.b64 | tr -d '\n' | base64 --decode > "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE.zip"
+          unzip -t "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE.zip"
       - name: Extract KONTUR project
-        run: unzip -q KONTUR_ENGINE_SOURCE.zip -d "$RUNNER_TEMP/kontur"
+        run: unzip -q "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE.zip" -d "$RUNNER_TEMP/kontur"
       - name: Build debug APK
         run: gradle --no-daemon -p "$RUNNER_TEMP/kontur/KONTUR_ENGINE_0_1" assembleDebug
       - name: Upload APK artifact
@@ -58,5 +48,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KONTUR-ENGINE-0.2-source
-          path: KONTUR_ENGINE_SOURCE.zip
+          path: ${{ runner.temp }}/KONTUR_ENGINE_SOURCE.zip
           if-no-files-found: error
