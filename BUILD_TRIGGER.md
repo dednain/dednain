@@ -1,0 +1,1 @@
+KONTUR Android APK build trigger. The source bundle is KONTUR_ENGINE_SOURCE.zip; see README-KONTUR.md.
