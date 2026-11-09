@@ -36,6 +36,13 @@ jobs:
           unzip -t "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE.zip"
       - name: Extract KONTUR project
         run: unzip -q "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE.zip" -d "$RUNNER_TEMP/kontur"
+      - name: Fix Java renderer name collision
+        run: |
+          sed -i 's/new Renderer()/new KonturRenderer()/; s/class Renderer implements/class KonturRenderer implements/' "$RUNNER_TEMP/kontur/KONTUR_ENGINE_0_1/app/src/main/java/com/kontur/engine/MainActivity.java"
+      - name: Package corrected source
+        run: |
+          cd "$RUNNER_TEMP/kontur"
+          zip -qr "$RUNNER_TEMP/KONTUR_ENGINE_SOURCE_FIXED.zip" KONTUR_ENGINE_0_1
       - name: Build debug APK
         run: gradle --no-daemon -p "$RUNNER_TEMP/kontur/KONTUR_ENGINE_0_1" assembleDebug
       - name: Upload APK artifact
@@ -48,5 +55,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KONTUR-ENGINE-0.2-source
-          path: ${{ runner.temp }}/KONTUR_ENGINE_SOURCE.zip
+          path: ${{ runner.temp }}/KONTUR_ENGINE_SOURCE_FIXED.zip
           if-no-files-found: error
