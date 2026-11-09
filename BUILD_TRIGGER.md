@@ -1,1 +1,1 @@
-KONTUR Android APK build trigger. Workflow repairs and validates the source archive before compiling.
+KONTUR Android APK build trigger. The workflow now applies the Java renderer fix and packages corrected source.
